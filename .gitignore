@@ -4,4 +4,3 @@ frontend/node_modules/
 .env
 .expo/
 dist/
-npm-debug.log*
