@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -9,30 +10,30 @@ const protect = (req, res, next) => {
       
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
       
-      // Usually you would fetch the user from DB, but for this component 
-      // we just need the userId to associate with the stock
-      req.user = { id: decoded.id || decoded.userId || decoded._id }; 
+      req.user = await User.findById(decoded.id || decoded.userId || decoded._id).select('-password');
       
+      if (!req.user) {
+         return res.status(401).json({ message: 'Not authorized, user not found' });
+      }
+
       next();
     } catch (error) {
       console.error(error);
-      // For development/integration testing without auth module ready:
-      // Fallback dummy user if verification fails
-      if (process.env.NODE_ENV === 'development_no_auth') {
-        req.user = { id: '60d0fe4f5311236168a109ca' }; // dummy valid ObjectId
-        return next();
-      }
       res.status(401).json({ message: 'Not authorized, token failed' });
     }
   }
 
   if (!token) {
-    if (process.env.NODE_ENV === 'development_no_auth') {
-      req.user = { id: '60d0fe4f5311236168a109ca' }; // dummy valid ObjectId
-      return next();
-    }
     res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 
-module.exports = { protect };
+const adminRole = (req, res, next) => {
+  if (req.user && req.user.role === 'Admin') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Access denied. Admin role required.' });
+  }
+};
+
+module.exports = { protect, adminRole };

@@ -33,6 +33,15 @@ const stockSchema = new mongoose.Schema({
   image: {
     type: String, // URL or file path
     required: true
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['Pending', 'Approved', 'Rejected'],
+    default: 'Pending'
+  },
+  visibility: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

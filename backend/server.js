@@ -17,7 +17,10 @@ app.use(cors());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
+const authRoutes = require('./routes/authRoutes');
 const stockRoutes = require('./routes/stockRoutes');
+
+app.use('/api/auth', authRoutes);
 app.use('/api/stocks', stockRoutes);
 
 // Main Server Startup logic (if this file is run directly)
