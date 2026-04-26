@@ -10,18 +10,32 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { bulkAddStocks } from '../../../services/stockService';
+import { getCategories } from '../../../services/categoryService';
 
 const BulkOperationsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
   
   // Start with one empty row
   const [rows, setRows] = useState([
-    { id: 1, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '', image: '' }
+    { id: 1, categoryId: null, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '', image: '' }
   ]);
+
+  React.useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await getCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
 
   const addRow = () => {
     const newId = rows.length > 0 ? rows[rows.length - 1].id + 1 : 1;
-    setRows([...rows, { id: newId, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '', image: '' }]);
+    setRows([...rows, { id: newId, categoryId: null, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '', image: '' }]);
   };
 
   const removeRow = (id) => {
@@ -46,6 +60,7 @@ const BulkOperationsScreen = ({ navigation }) => {
         return;
       }
       validStocks.push({
+        categoryId: row.categoryId || undefined,
         vegetableName: row.vegetableName,
         quantity: Number(row.quantity),
         pricePerKg: Number(row.pricePerKg),
@@ -83,6 +98,31 @@ const BulkOperationsScreen = ({ navigation }) => {
                 <Text style={styles.removeIcon}>❌</Text>
               </TouchableOpacity>
             </View>
+
+            {categories.length > 0 && (
+              <View style={styles.categoryContainer}>
+                <Text style={styles.categoryLabel}>Category (Optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                  {categories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat._id}
+                      style={[
+                        styles.categoryChip,
+                        row.categoryId === cat._id && styles.categoryChipActive
+                      ]}
+                      onPress={() => updateRow(row.id, 'categoryId', row.categoryId === cat._id ? null : cat._id)}
+                    >
+                      <Text style={[
+                        styles.categoryText,
+                        row.categoryId === cat._id && styles.categoryTextActive
+                      ]}>
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             <View style={styles.inputGroup}>
               <TextInput
@@ -240,6 +280,35 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  categoryContainer: {
+    marginBottom: 15,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    color: '#757575',
+    marginBottom: 5,
+  },
+  categoryScroll: {
+    flexDirection: 'row',
+  },
+  categoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#EEEEEE',
+    marginRight: 8,
+  },
+  categoryChipActive: {
+    backgroundColor: '#FF9800',
+  },
+  categoryText: {
+    color: '#616161',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  categoryTextActive: {
+    color: '#FFFFFF',
   }
 });
 

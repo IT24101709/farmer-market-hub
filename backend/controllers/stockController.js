@@ -7,7 +7,7 @@ const path = require('path');
 // @access  Private (Farmer only)
 exports.createStock = async (req, res) => {
   try {
-    const { vegetableName, quantity, pricePerKg, expiryDate } = req.body;
+    const { vegetableName, quantity, pricePerKg, expiryDate, categoryId } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: 'Image is required' });
@@ -17,6 +17,7 @@ exports.createStock = async (req, res) => {
 
     const newStock = new Stock({
       farmerId: req.user.id, // Assuming authMiddleware sets req.user
+      categoryId: categoryId || undefined,
       vegetableName,
       quantity,
       pricePerKg,
@@ -269,6 +270,7 @@ exports.bulkAddStocks = async (req, res) => {
     const farmerId = req.user.id;
     const stocksToInsert = stocks.map(stock => ({
       farmerId,
+      categoryId: stock.categoryId || undefined,
       vegetableName: stock.vegetableName,
       quantity: stock.quantity,
       pricePerKg: stock.pricePerKg,

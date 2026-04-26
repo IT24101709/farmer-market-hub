@@ -6,6 +6,11 @@ const stockSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    required: false // Optional to prevent breaking existing stocks
+  },
   vegetableName: {
     type: String,
     required: true,

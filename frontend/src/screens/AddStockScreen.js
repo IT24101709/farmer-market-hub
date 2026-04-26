@@ -16,6 +16,7 @@ import { createStock } from '../services/stockService';
 
 import { AuthContext } from '../context/AuthContext';
 import { getPriceTrends } from '../services/farmerService';
+import { getCategories } from '../services/categoryService';
 
 const AddStockScreen = ({ navigation }) => {
   const { token } = React.useContext(AuthContext);
@@ -25,9 +26,24 @@ const AddStockScreen = ({ navigation }) => {
   const [expiryDate, setExpiryDate] = useState(''); // Simple text fallback for dates, better to use DateTimePicker in production
   const [image, setImage] = useState(null);
   
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [suggestedPrice, setSuggestedPrice] = useState(null);
+
+  React.useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await getCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
 
   React.useEffect(() => {
     const fetchTrend = async () => {
@@ -123,6 +139,9 @@ const AddStockScreen = ({ navigation }) => {
       setLoading(true);
 
       const formData = new FormData();
+      if (selectedCategory) {
+        formData.append('categoryId', selectedCategory);
+      }
       formData.append('vegetableName', vegetableName);
       formData.append('quantity', quantity);
       formData.append('pricePerKg', pricePerKg);
@@ -161,6 +180,33 @@ const AddStockScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.formContainer}>
+        {categories.length > 0 && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Category (Optional)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat._id}
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === cat._id && styles.categoryChipActive
+                  ]}
+                  onPress={() => setSelectedCategory(
+                    selectedCategory === cat._id ? null : cat._id
+                  )}
+                >
+                  <Text style={[
+                    styles.categoryText,
+                    selectedCategory === cat._id && styles.categoryTextActive
+                  ]}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Vegetable Name *</Text>
           <TextInput
@@ -332,6 +378,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 5,
     fontStyle: 'italic',
+  },
+  categoryScroll: {
+    marginTop: 5,
+  },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#EEEEEE',
+    marginRight: 10,
+  },
+  categoryChipActive: {
+    backgroundColor: '#FF9800',
+  },
+  categoryText: {
+    color: '#616161',
+    fontWeight: '600',
+  },
+  categoryTextActive: {
+    color: '#FFFFFF',
   },
   imageSection: {
     marginBottom: 30,

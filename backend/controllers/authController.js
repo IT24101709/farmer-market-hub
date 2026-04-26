@@ -81,6 +81,13 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      // Check if user is suspended
+      if (user.status === 'Suspended') {
+        return res.status(403).json({
+          message: 'Your account has been suspended by the administrator.'
+        });
+      }
+
       // Check if farmer is approved
       if (user.role === 'Farmer' && !user.isApproved) {
         return res.status(403).json({ 
@@ -96,6 +103,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         isApproved: user.isApproved,
+        status: user.status,
         token: generateToken(user._id)
       });
     } else {

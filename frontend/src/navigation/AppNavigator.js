@@ -13,6 +13,8 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import FarmerApprovalScreen from '../screens/admin/FarmerApprovalScreen';
+import ManageFarmersScreen from '../screens/admin/ManageFarmersScreen';
+import ManageCategoriesScreen from '../screens/admin/ManageCategoriesScreen';
 import FarmerDashboardScreen from '../screens/farmer/FarmerDashboardScreen';
 import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
 import BulkOperationsScreen from '../screens/farmer/BulkOperationsScreen';
@@ -48,8 +50,10 @@ const AdminStack = () => (
       headerTitleStyle: { fontWeight: 'bold' }
     }}
   >
-    <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Admin Overview' }} />
-    <Stack.Screen name="FarmerApproval" component={FarmerApprovalScreen} options={{ title: 'Approve Farmers' }} />
+    <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="FarmerApproval" component={FarmerApprovalScreen} options={{ title: 'Pending Approvals' }} />
+    <Stack.Screen name="ManageFarmers" component={ManageFarmersScreen} options={{ title: 'Manage Farmers' }} />
+    <Stack.Screen name="ManageCategories" component={ManageCategoriesScreen} options={{ title: 'Manage Categories' }} />
   </Stack.Navigator>
 );
 
