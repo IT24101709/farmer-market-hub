@@ -79,3 +79,27 @@ exports.getProductById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// @desc    Get public products for landing page
+// @route   GET /api/market/public
+// @access  Public
+exports.getPublicProducts = async (req, res) => {
+  try {
+    const filter = {
+      visibility: true,
+      approvalStatus: 'Approved',
+      status: 'Available',
+      expiryDate: { $gt: new Date() }
+    };
+
+    // Get a limited number of recent products (e.g., 6)
+    const products = await Stock.find(filter)
+      .populate('farmerId', 'name')
+      .sort({ createdAt: -1 })
+      .limit(6);
+
+    res.status(200).json(products);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

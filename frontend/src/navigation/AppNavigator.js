@@ -19,6 +19,7 @@ import FarmerDashboardScreen from '../screens/farmer/FarmerDashboardScreen';
 import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
 import BulkOperationsScreen from '../screens/farmer/BulkOperationsScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
+import LandingScreen from '../screens/public/LandingScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -71,7 +72,8 @@ const CustomerStack = () => (
 );
 
 const AuthStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
+  <Stack.Navigator initialRouteName="Landing" screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Landing" component={LandingScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
   </Stack.Navigator>
