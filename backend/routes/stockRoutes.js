@@ -5,7 +5,10 @@ const {
   getMyStocks,
   getStockById,
   updateStock,
-  deleteStock
+  deleteStock,
+  toggleVisibility,
+  updateStatus,
+  removeExpiredStock
 } = require('../controllers/stockController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -21,5 +24,14 @@ router.route('/:id')
   .get(protect, getStockById)
   .put(protect, upload.single('image'), updateStock)
   .delete(protect, deleteStock);
+
+router.route('/:id/visibility')
+  .patch(protect, toggleVisibility);
+
+router.route('/:id/status')
+  .patch(protect, updateStatus);
+
+router.route('/expired/all')
+  .delete(protect, removeExpiredStock);
 
 module.exports = router;

@@ -70,11 +70,24 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message || 'Registration failed');
       }
 
-      setToken(data.token);
-      setUser(data);
-      
-      await AsyncStorage.setItem('userToken', data.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(data));
+      // Only set token and user if farmer is approved or not a farmer
+      if (data.token) {
+        setToken(data.token);
+        setUser(data);
+        
+        await AsyncStorage.setItem('userToken', data.token);
+        await AsyncStorage.setItem('userData', JSON.stringify(data));
+      } else if (role === 'Farmer' && !data.isApproved) {
+        // For farmers awaiting approval, store their data but not the token
+        // This allows them to see their approval status
+        setUser(data);
+        await AsyncStorage.setItem('userData', JSON.stringify(data));
+        // Return the data with a message
+        return {
+          ...data,
+          message: data.message || 'Registration successful! Please wait for admin approval.'
+        };
+      }
       
       return data;
     } catch (error) {

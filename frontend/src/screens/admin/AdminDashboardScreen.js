@@ -14,8 +14,8 @@ const AdminDashboardScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.card} onPress={() => {}}>
           <Text style={styles.cardTitle}>View Payments</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.card} onPress={() => {}}>
-          <Text style={styles.cardTitle}>Manage Users</Text>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('FarmerApproval')}>
+          <Text style={styles.cardTitle}>Approve Farmers</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.card} onPress={() => {}}>
           <Text style={styles.cardTitle}>Approve Products</Text>

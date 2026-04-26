@@ -158,3 +158,100 @@ exports.deleteStock = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// @desc    Toggle visibility (list/unlist from marketplace)
+// @route   PATCH /api/stocks/:id/visibility
+// @access  Private (Farmer only)
+exports.toggleVisibility = async (req, res) => {
+  try {
+    const stock = await Stock.findById(req.params.id);
+
+    if (!stock) {
+      return res.status(404).json({ message: 'Stock not found' });
+    }
+
+    if (stock.farmerId.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    // Cannot make visible if not approved yet
+    if (!stock.visibility && stock.approvalStatus !== 'Approved') {
+      return res.status(400).json({
+        message: 'Stock must be approved by admin before it can be listed on the marketplace'
+      });
+    }
+
+    stock.visibility = !stock.visibility;
+    await stock.save();
+
+    res.status(200).json({
+      message: stock.visibility ? 'Stock listed on marketplace' : 'Stock unlisted from marketplace',
+      visibility: stock.visibility,
+      stock
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Update stock availability status (Available / Out of Stock)
+// @route   PATCH /api/stocks/:id/status
+// @access  Private (Farmer only)
+exports.updateStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowedStatuses = ['Available', 'Out of Stock'];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        message: `Status must be one of: ${allowedStatuses.join(', ')}`
+      });
+    }
+
+    const stock = await Stock.findById(req.params.id);
+
+    if (!stock) {
+      return res.status(404).json({ message: 'Stock not found' });
+    }
+
+    if (stock.farmerId.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    stock.status = status;
+    await stock.save();
+
+    res.status(200).json({ message: `Status updated to ${status}`, stock });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Remove all expired stock for the logged-in farmer
+// @route   DELETE /api/stocks/expired
+// @access  Private (Farmer only)
+exports.removeExpiredStock = async (req, res) => {
+  try {
+    const now = new Date();
+
+    // First auto-mark anything past expiry as Expired
+    await Stock.updateMany(
+      { farmerId: req.user.id, expiryDate: { $lt: now }, status: { $ne: 'Expired' } },
+      { $set: { status: 'Expired', visibility: false } }
+    );
+
+    // Delete all expired records for this farmer
+    const result = await Stock.deleteMany({
+      farmerId: req.user.id,
+      status: 'Expired'
+    });
+
+    res.status(200).json({
+      message: `Removed ${result.deletedCount} expired stock item(s)`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+

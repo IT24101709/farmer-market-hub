@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, AuthContext } from '../context/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -12,8 +12,10 @@ import StockDetailScreen from '../screens/StockDetailScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import FarmerApprovalScreen from '../screens/admin/FarmerApprovalScreen';
+import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const FarmerStack = () => (
   <Stack.Navigator 
@@ -41,6 +43,20 @@ const AdminStack = () => (
     }}
   >
     <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Admin Overview' }} />
+    <Stack.Screen name="FarmerApproval" component={FarmerApprovalScreen} options={{ title: 'Approve Farmers' }} />
+  </Stack.Navigator>
+);
+
+const CustomerStack = () => (
+  <Stack.Navigator
+    initialRouteName="Marketplace"
+    screenOptions={{
+      headerStyle: { backgroundColor: '#2196F3' },
+      headerTintColor: '#fff',
+      headerTitleStyle: { fontWeight: 'bold' }
+    }}
+  >
+    <Stack.Screen name="Marketplace" component={MarketplaceScreen} options={{ title: 'Fresh Marketplace' }} />
   </Stack.Navigator>
 );
 
@@ -65,7 +81,9 @@ const MainNavigation = () => {
   return (
     <NavigationContainer>
       {user ? (
-        user.role === 'Admin' ? <AdminStack /> : <FarmerStack />
+        user.role === 'Admin' ? <AdminStack /> :
+        user.role === 'Farmer' ? <FarmerStack /> :
+        <CustomerStack />
       ) : (
         <AuthStack />
       )}

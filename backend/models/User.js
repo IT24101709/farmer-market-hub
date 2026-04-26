@@ -28,10 +28,18 @@ const userSchema = new mongoose.Schema({
     enum: ['Active', 'Suspended'],
     default: 'Active'
   },
+  // Farmer approval by admin
+  isApproved: {
+    type: Boolean,
+    default: function() {
+      return this.role === 'Farmer' ? false : true; // Farmers need approval, others are auto-approved
+    }
+  },
   // Additional details can be added later (address, phone, business name for farmers)
   profileDetails: {
     phone: String,
-    address: String
+    address: String,
+    businessName: String // For farmers
   }
 }, {
   timestamps: true
