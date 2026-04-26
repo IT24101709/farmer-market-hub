@@ -8,7 +8,9 @@ const {
   deleteStock,
   toggleVisibility,
   updateStatus,
-  removeExpiredStock
+  removeExpiredStock,
+  bulkAddStocks,
+  bulkUpdateStocks
 } = require('../controllers/stockController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -19,6 +21,13 @@ router.route('/')
 
 router.route('/my')
   .get(protect, getMyStocks);
+
+// Bulk operations (Must be before /:id)
+router.route('/bulk/add')
+  .post(protect, bulkAddStocks);
+
+router.route('/bulk/update')
+  .put(protect, bulkUpdateStocks);
 
 router.route('/:id')
   .get(protect, getStockById)

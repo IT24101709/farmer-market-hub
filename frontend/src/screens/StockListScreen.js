@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   Image, 
   ActivityIndicator,
-  TextInput
+  TextInput,
+  ScrollView
 } from 'react-native';
 import { getMyStocks } from '../services/stockService';
 
@@ -18,12 +19,14 @@ const StockListScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('All'); // All, Available, Expired
+  const [priceFilter, setPriceFilter] = useState('All'); // All, Under 100, 100-500, Over 500
+  const [dateFilter, setDateFilter] = useState('All'); // All, Last 7 Days, Last 30 Days
 
   const fetchStocks = async () => {
     try {
       const data = await getMyStocks();
       setStocks(data);
-      applyFilters(data, searchQuery, filter);
+      applyFilters(data, searchQuery, filter, priceFilter, dateFilter);
     } catch (error) {
       console.error('Error fetching stocks:', error);
       // Fallback empty data if server is down for now
@@ -42,7 +45,7 @@ const StockListScreen = ({ navigation }) => {
     return unsubscribe;
   }, [navigation]);
 
-  const applyFilters = (data, query, currentFilter) => {
+  const applyFilters = (data, query, currentFilter, currentPriceFilter, currentDateFilter) => {
     let result = data;
     
     // Search by name
@@ -56,17 +59,51 @@ const StockListScreen = ({ navigation }) => {
     if (currentFilter !== 'All') {
       result = result.filter(item => item.status === currentFilter);
     }
+
+    // Filter by price
+    if (currentPriceFilter !== 'All') {
+      result = result.filter(item => {
+        if (currentPriceFilter === 'Under 100') return item.pricePerKg < 100;
+        if (currentPriceFilter === '100-500') return item.pricePerKg >= 100 && item.pricePerKg <= 500;
+        if (currentPriceFilter === 'Over 500') return item.pricePerKg > 500;
+        return true;
+      });
+    }
+
+    // Filter by date added
+    if (currentDateFilter !== 'All') {
+      const now = new Date();
+      result = result.filter(item => {
+        const itemDate = new Date(item.createdAt || item.updatedAt || now); // Fallback to now if no date
+        const diffTime = Math.abs(now - itemDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (currentDateFilter === 'Last 7 Days') return diffDays <= 7;
+        if (currentDateFilter === 'Last 30 Days') return diffDays <= 30;
+        return true;
+      });
+    }
     
     setFilteredStocks(result);
   };
 
   const handleSearch = (text) => {
     setSearchQuery(text);
-    applyFilters(stocks, text, filter);
+    applyFilters(stocks, text, filter, priceFilter, dateFilter);
+  };
+
+  const handleFilterChange = (type, value) => {
+    let f = filter, pf = priceFilter, df = dateFilter;
+    if (type === 'status') { setFilter(value); f = value; }
+    if (type === 'price') { setPriceFilter(value); pf = value; }
+    if (type === 'date') { setDateFilter(value); df = value; }
+    applyFilters(stocks, searchQuery, f, pf, df);
   };
 
   const clearFilters = () => {
     setFilter('All');
+    setPriceFilter('All');
+    setDateFilter('All');
     setSearchQuery('');
     setFilteredStocks(stocks);
   };
@@ -138,25 +175,54 @@ const StockListScreen = ({ navigation }) => {
         />
       </View>
 
-      <View style={styles.filterContainer}>
-        <TouchableOpacity 
-          style={[styles.filterChip, filter === 'All' && styles.filterChipActive]}
-          onPress={() => { setFilter('All'); applyFilters(stocks, searchQuery, 'All'); }}
-        >
-          <Text style={[styles.filterText, filter === 'All' && styles.filterTextActive]}>All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.filterChip, filter === 'Available' && styles.filterChipActive]}
-          onPress={() => { setFilter('Available'); applyFilters(stocks, searchQuery, 'Available'); }}
-        >
-          <Text style={[styles.filterText, filter === 'Available' && styles.filterTextActive]}>Available</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.filterChip, filter === 'Expired' && styles.filterChipActive]}
-          onPress={() => { setFilter('Expired'); applyFilters(stocks, searchQuery, 'Expired'); }}
-        >
-          <Text style={[styles.filterText, filter === 'Expired' && styles.filterTextActive]}>Expired</Text>
-        </TouchableOpacity>
+      <View style={styles.filterContainerWrapper}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
+          <Text style={styles.filterLabel}>Status:</Text>
+          <TouchableOpacity 
+            style={[styles.filterChip, filter === 'All' && styles.filterChipActive]}
+            onPress={() => handleFilterChange('status', 'All')}
+          >
+            <Text style={[styles.filterText, filter === 'All' && styles.filterTextActive]}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.filterChip, filter === 'Available' && styles.filterChipActive]}
+            onPress={() => handleFilterChange('status', 'Available')}
+          >
+            <Text style={[styles.filterText, filter === 'Available' && styles.filterTextActive]}>Available</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.filterChip, filter === 'Expired' && styles.filterChipActive]}
+            onPress={() => handleFilterChange('status', 'Expired')}
+          >
+            <Text style={[styles.filterText, filter === 'Expired' && styles.filterTextActive]}>Expired</Text>
+          </TouchableOpacity>
+
+          <View style={styles.filterDivider} />
+          
+          <Text style={styles.filterLabel}>Price:</Text>
+          {['All', 'Under 100', '100-500', 'Over 500'].map(pFilter => (
+            <TouchableOpacity 
+              key={pFilter}
+              style={[styles.filterChip, priceFilter === pFilter && styles.filterChipActive]}
+              onPress={() => handleFilterChange('price', pFilter)}
+            >
+              <Text style={[styles.filterText, priceFilter === pFilter && styles.filterTextActive]}>{pFilter}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <View style={styles.filterDivider} />
+          
+          <Text style={styles.filterLabel}>Date:</Text>
+          {['All', 'Last 7 Days', 'Last 30 Days'].map(dFilter => (
+            <TouchableOpacity 
+              key={dFilter}
+              style={[styles.filterChip, dateFilter === dFilter && styles.filterChipActive]}
+              onPress={() => handleFilterChange('date', dFilter)}
+            >
+              <Text style={[styles.filterText, dateFilter === dFilter && styles.filterTextActive]}>{dFilter}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {filteredStocks.length === 0 ? (
@@ -234,11 +300,26 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     fontSize: 16,
   },
+  filterContainerWrapper: {
+    height: 60,
+  },
   filterContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: 10,
     gap: 10,
+  },
+  filterLabel: {
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 5,
+  },
+  filterDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#CCC',
+    marginHorizontal: 5,
   },
   filterChip: {
     paddingHorizontal: 16,

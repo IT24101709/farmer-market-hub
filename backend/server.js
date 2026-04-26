@@ -20,10 +20,12 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 const authRoutes = require('./routes/authRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const marketRoutes = require('./routes/marketRoutes');
+const farmerRoutes = require('./routes/farmerRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stocks', stockRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/farmer', farmerRoutes);
 
 // Main Server Startup logic (if this file is run directly)
 if (require.main === module) {

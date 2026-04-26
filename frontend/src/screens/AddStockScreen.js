@@ -14,7 +14,11 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { createStock } from '../services/stockService';
 
+import { AuthContext } from '../context/AuthContext';
+import { getPriceTrends } from '../services/farmerService';
+
 const AddStockScreen = ({ navigation }) => {
+  const { token } = React.useContext(AuthContext);
   const [vegetableName, setVegetableName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [pricePerKg, setPricePerKg] = useState('');
@@ -23,6 +27,31 @@ const AddStockScreen = ({ navigation }) => {
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [suggestedPrice, setSuggestedPrice] = useState(null);
+
+  React.useEffect(() => {
+    const fetchTrend = async () => {
+      if (vegetableName.length > 2) {
+        try {
+          const res = await getPriceTrends(vegetableName, token);
+          if (res && res.suggestedRange) {
+            setSuggestedPrice(res.suggestedRange);
+          } else {
+            setSuggestedPrice(null);
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      } else {
+        setSuggestedPrice(null);
+      }
+    };
+    
+    const timeoutId = setTimeout(() => {
+      fetchTrend();
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [vegetableName, token]);
 
   const pickImage = async () => {
     // Request permissions
@@ -144,6 +173,11 @@ const AddStockScreen = ({ navigation }) => {
             }}
           />
           {errors.vegetableName && <Text style={styles.errorText}>{errors.vegetableName}</Text>}
+          {suggestedPrice && (
+            <Text style={styles.suggestionText}>
+              Market Price Trend: LKR {suggestedPrice.min} - {suggestedPrice.max} (Avg: {suggestedPrice.average})
+            </Text>
+          )}
         </View>
 
         <View style={styles.row}>
@@ -292,6 +326,12 @@ const styles = StyleSheet.create({
     color: '#F44336',
     fontSize: 12,
     marginTop: 5,
+  },
+  suggestionText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    marginTop: 5,
+    fontStyle: 'italic',
   },
   imageSection: {
     marginBottom: 30,

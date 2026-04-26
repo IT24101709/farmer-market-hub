@@ -6,7 +6,8 @@ const {
   getMe,
   getPendingFarmers,
   approveFarmer,
-  rejectFarmer
+  rejectFarmer,
+  updateProfile
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -16,6 +17,7 @@ router.post('/login', loginUser);
 
 // Protected routes
 router.get('/me', protect, getMe);
+router.put('/profile', protect, updateProfile);
 
 // Admin only routes
 router.get('/admin/pending-farmers', protect, getPendingFarmers);

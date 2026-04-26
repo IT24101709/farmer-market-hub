@@ -78,3 +78,31 @@ export const deleteStock = async (id) => {
     throw error.response?.data || error.message;
   }
 };
+
+export const bulkAddStocks = async (stocksArray) => {
+  try {
+    const response = await axios.post(`${API_URL}/bulk/add`, { stocks: stocksArray }, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const bulkUpdateStocks = async (stocksArray) => {
+  try {
+    const response = await axios.put(`${API_URL}/bulk/update`, { stocks: stocksArray }, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

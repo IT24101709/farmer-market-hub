@@ -13,23 +13,29 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import FarmerApprovalScreen from '../screens/admin/FarmerApprovalScreen';
+import FarmerDashboardScreen from '../screens/farmer/FarmerDashboardScreen';
+import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
+import BulkOperationsScreen from '../screens/farmer/BulkOperationsScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 
 const Stack = createNativeStackNavigator();
 
 const FarmerStack = () => (
   <Stack.Navigator 
-    initialRouteName="StockList"
+    initialRouteName="FarmerDashboard"
     screenOptions={{
       headerStyle: { backgroundColor: '#4CAF50' },
       headerTintColor: '#fff',
       headerTitleStyle: { fontWeight: 'bold' }
     }}
   >
+    <Stack.Screen name="FarmerDashboard" component={FarmerDashboardScreen} options={{ headerShown: false }} />
     <Stack.Screen name="StockList" component={StockListScreen} options={{ title: 'My Harvest' }} />
     <Stack.Screen name="AddStock" component={AddStockScreen} options={{ title: 'Add New Vegetable' }} />
     <Stack.Screen name="StockDetail" component={StockDetailScreen} options={{ title: 'Stock Details' }} />
     <Stack.Screen name="EditStock" component={EditStockScreen} options={{ title: 'Edit Stock' }} />
+    <Stack.Screen name="FarmerProfile" component={FarmerProfileScreen} options={{ title: 'My Profile' }} />
+    <Stack.Screen name="BulkOperations" component={BulkOperationsScreen} options={{ title: 'Bulk Operations' }} />
   </Stack.Navigator>
 );
 

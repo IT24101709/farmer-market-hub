@@ -255,3 +255,72 @@ exports.removeExpiredStock = async (req, res) => {
   }
 };
 
+// @desc    Bulk add stocks
+// @route   POST /api/stocks/bulk
+// @access  Private (Farmer only)
+exports.bulkAddStocks = async (req, res) => {
+  try {
+    // Expects an array of stock objects in req.body.stocks
+    const { stocks } = req.body;
+    if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
+      return res.status(400).json({ message: 'Please provide an array of stocks' });
+    }
+
+    const farmerId = req.user.id;
+    const stocksToInsert = stocks.map(stock => ({
+      farmerId,
+      vegetableName: stock.vegetableName,
+      quantity: stock.quantity,
+      pricePerKg: stock.pricePerKg,
+      expiryDate: stock.expiryDate,
+      image: stock.image || '/uploads/default-veg.png', // Default image placeholder
+      status: 'Available'
+    }));
+
+    const insertedStocks = await Stock.insertMany(stocksToInsert);
+    res.status(201).json({ message: `Successfully added ${insertedStocks.length} items`, insertedStocks });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Bulk update stocks
+// @route   PUT /api/stocks/bulk
+// @access  Private (Farmer only)
+exports.bulkUpdateStocks = async (req, res) => {
+  try {
+    // Expects an array of objects: { _id, quantity, pricePerKg, ... }
+    const { stocks } = req.body;
+    if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
+      return res.status(400).json({ message: 'Please provide an array of stocks to update' });
+    }
+
+    const farmerId = req.user.id;
+    let updatedCount = 0;
+
+    // Use a loop to update each document. For larger datasets, bulkWrite is better.
+    for (let stock of stocks) {
+      if (!stock._id) continue;
+      
+      const existingStock = await Stock.findOne({ _id: stock._id, farmerId });
+      if (existingStock) {
+        if (stock.quantity !== undefined) existingStock.quantity = stock.quantity;
+        if (stock.pricePerKg !== undefined) existingStock.pricePerKg = stock.pricePerKg;
+        if (stock.status !== undefined) existingStock.status = stock.status;
+        
+        // Auto-remove if quantity <= 0
+        if (existingStock.quantity <= 0) {
+          await Stock.findByIdAndDelete(existingStock._id);
+        } else {
+          await existingStock.save();
+        }
+        updatedCount++;
+      }
+    }
+
+    res.status(200).json({ message: `Successfully updated ${updatedCount} items` });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
