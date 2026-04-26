@@ -1,23 +1,23 @@
 import axios from 'axios';
 
-// Replace with your actual backend URL or use React Native env variables
-const API_URL = 'http://localhost:5000/api/stocks';
+import getEnvVars from '../config';
+
+const { apiUrl } = getEnvVars();
+const API_URL = `${apiUrl}/stocks`;
 
 // You would typically get this from your Auth context or AsyncStorage
-const getAuthHeaders = () => {
-  // Mock token for development - replace with actual token retrieval
-  const token = 'your-jwt-token-here';
+const getAuthHeaders = (token) => {
   return {
     Authorization: `Bearer ${token}`
   };
 };
 
-export const createStock = async (stockData) => {
+export const createStock = async (stockData, token) => {
   try {
     const response = await axios.post(API_URL, stockData, {
       headers: {
         'Content-Type': 'multipart/form-data',
-        ...getAuthHeaders()
+        ...getAuthHeaders(token)
       }
     });
     return response.data;
@@ -26,10 +26,10 @@ export const createStock = async (stockData) => {
   }
 };
 
-export const getMyStocks = async () => {
+export const getMyStocks = async (token, page = 1, limit = 20) => {
   try {
-    const response = await axios.get(`${API_URL}/my`, {
-      headers: getAuthHeaders()
+    const response = await axios.get(`${API_URL}/my?page=${page}&limit=${limit}`, {
+      headers: getAuthHeaders(token)
     });
     return response.data;
   } catch (error) {
@@ -37,10 +37,10 @@ export const getMyStocks = async () => {
   }
 };
 
-export const getStockById = async (id) => {
+export const getStockById = async (id, token) => {
   try {
     const response = await axios.get(`${API_URL}/${id}`, {
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(token)
     });
     return response.data;
   } catch (error) {
@@ -48,9 +48,9 @@ export const getStockById = async (id) => {
   }
 };
 
-export const updateStock = async (id, stockData) => {
+export const updateStock = async (id, stockData, token) => {
   try {
-    const headers = { ...getAuthHeaders() };
+    const headers = { ...getAuthHeaders(token) };
     
     // Check if the data is FormData (when image is updated) or regular JSON
     if (stockData instanceof FormData) {
@@ -68,10 +68,10 @@ export const updateStock = async (id, stockData) => {
   }
 };
 
-export const deleteStock = async (id) => {
+export const deleteStock = async (id, token) => {
   try {
     const response = await axios.delete(`${API_URL}/${id}`, {
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(token)
     });
     return response.data;
   } catch (error) {
@@ -79,12 +79,12 @@ export const deleteStock = async (id) => {
   }
 };
 
-export const bulkAddStocks = async (stocksArray) => {
+export const bulkAddStocks = async (stocksArray, token) => {
   try {
     const response = await axios.post(`${API_URL}/bulk/add`, { stocks: stocksArray }, {
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders()
+        ...getAuthHeaders(token)
       }
     });
     return response.data;
@@ -93,12 +93,12 @@ export const bulkAddStocks = async (stocksArray) => {
   }
 };
 
-export const bulkUpdateStocks = async (stocksArray) => {
+export const bulkUpdateStocks = async (stocksArray, token) => {
   try {
     const response = await axios.put(`${API_URL}/bulk/update`, { stocks: stocksArray }, {
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders()
+        ...getAuthHeaders(token)
       }
     });
     return response.data;

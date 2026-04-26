@@ -1,4 +1,5 @@
 const Stock = require('../models/Stock');
+const StockHistory = require('../models/StockHistory');
 const fs = require('fs');
 const path = require('path');
 
@@ -26,19 +27,46 @@ exports.createStock = async (req, res) => {
     });
 
     const savedStock = await newStock.save();
+
+    await StockHistory.create({
+      stockId: savedStock._id,
+      userId: req.user.id,
+      action: 'CREATED',
+      changes: { quantity, pricePerKg, status: 'Available' }
+    });
+
     res.status(201).json(savedStock);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Get all stocks for logged-in farmer
+// @desc    Get all stocks for logged-in farmer with pagination
 // @route   GET /api/stocks/my
 // @access  Private
 exports.getMyStocks = async (req, res) => {
   try {
-    const stocks = await Stock.find({ farmerId: req.user.id }).sort({ createdAt: -1 });
-    res.status(200).json(stocks);
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [stocks, total] = await Promise.all([
+      Stock.find({ farmerId: req.user.id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Stock.countDocuments({ farmerId: req.user.id })
+    ]);
+
+    res.status(200).json({
+      stocks,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit))
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -84,17 +112,13 @@ exports.updateStock = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    // Assignment requirement: removes stock records when quantity reaches zero
+    // Assignment requirement: if quantity = 0 -> availability = false (status Out of Stock)
+    let updatedStatus = status || stock.status;
+    let updatedVisibility = stock.visibility;
+
     if (quantity !== undefined && Number(quantity) <= 0) {
-      // Delete the image file if possible
-      if (stock.image) {
-        const filePath = path.join(__dirname, '..', stock.image);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
-      await Stock.findByIdAndDelete(req.params.id);
-      return res.status(200).json({ message: 'Stock removed automatically as quantity reached zero', removed: true });
+      updatedStatus = 'Out of Stock';
+      updatedVisibility = false;
     }
 
     let updatedStatus = status || stock.status;
@@ -118,13 +142,25 @@ exports.updateStock = async (req, res) => {
     }
 
     stock.vegetableName = vegetableName || stock.vegetableName;
-    stock.quantity = quantity || stock.quantity;
+    stock.quantity = quantity !== undefined ? quantity : stock.quantity;
     stock.pricePerKg = pricePerKg || stock.pricePerKg;
     stock.expiryDate = expDate;
     stock.status = updatedStatus;
+    stock.visibility = updatedVisibility;
     stock.image = newImage;
 
     const updatedStock = await stock.save();
+
+    await StockHistory.create({
+      stockId: updatedStock._id,
+      userId: req.user.id,
+      action: 'UPDATED',
+      changes: {
+        quantity: { new: updatedStock.quantity },
+        status: { new: updatedStock.status }
+      }
+    });
+
     res.status(200).json(updatedStock);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -154,6 +190,14 @@ exports.deleteStock = async (req, res) => {
     }
 
     await Stock.findByIdAndDelete(req.params.id);
+
+    await StockHistory.create({
+      stockId: stock._id,
+      userId: req.user.id,
+      action: 'DELETED',
+      changes: { deleted: true }
+    });
+
     res.status(200).json({ message: 'Stock removed successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -303,13 +347,13 @@ exports.bulkUpdateStocks = async (req, res) => {
     // Use a loop to update each document. For larger datasets, bulkWrite is better.
     for (let stock of stocks) {
       if (!stock._id) continue;
-      
+
       const existingStock = await Stock.findOne({ _id: stock._id, farmerId });
       if (existingStock) {
         if (stock.quantity !== undefined) existingStock.quantity = stock.quantity;
         if (stock.pricePerKg !== undefined) existingStock.pricePerKg = stock.pricePerKg;
         if (stock.status !== undefined) existingStock.status = stock.status;
-        
+
         // Auto-remove if quantity <= 0
         if (existingStock.quantity <= 0) {
           await Stock.findByIdAndDelete(existingStock._id);

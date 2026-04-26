@@ -9,8 +9,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Helper to get base URL
-  // Assuming android emulator uses 10.0.2.2 or similar. Fallback to common localhost pattern.
-  const API_URL = 'http://10.0.2.2:5000/api/auth';
+  const { apiUrl } = require('../config').default();
+  const API_URL = `${apiUrl}/auth`;
 
   useEffect(() => {
     // Check if user is logged in
@@ -45,10 +45,11 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message || 'Login failed');
       }
 
-      setToken(data.token);
+      setToken(data.accessToken || data.token); // Fallback to token if backend not fully updated
       setUser(data);
       
-      await AsyncStorage.setItem('userToken', data.token);
+      await AsyncStorage.setItem('userToken', data.accessToken || data.token);
+      if (data.refreshToken) await AsyncStorage.setItem('refreshToken', data.refreshToken);
       await AsyncStorage.setItem('userData', JSON.stringify(data));
       
       return data;
@@ -71,11 +72,13 @@ export const AuthProvider = ({ children }) => {
       }
 
       // Only set token and user if farmer is approved or not a farmer
-      if (data.token) {
-        setToken(data.token);
+      if (data.accessToken || data.token) {
+        const tokenToStore = data.accessToken || data.token;
+        setToken(tokenToStore);
         setUser(data);
         
-        await AsyncStorage.setItem('userToken', data.token);
+        await AsyncStorage.setItem('userToken', tokenToStore);
+        if (data.refreshToken) await AsyncStorage.setItem('refreshToken', data.refreshToken);
         await AsyncStorage.setItem('userData', JSON.stringify(data));
       } else if (role === 'Farmer' && !data.isApproved) {
         // For farmers awaiting approval, store their data but not the token
@@ -98,6 +101,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('userData');
       setToken(null);
       setUser(null);
@@ -122,10 +126,12 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message || 'Profile update failed');
       }
 
-      setToken(data.token);
+      const tokenToStore = data.accessToken || data.token;
+      setToken(tokenToStore);
       setUser(data);
       
-      await AsyncStorage.setItem('userToken', data.token);
+      await AsyncStorage.setItem('userToken', tokenToStore);
+      if (data.refreshToken) await AsyncStorage.setItem('refreshToken', data.refreshToken);
       await AsyncStorage.setItem('userData', JSON.stringify(data));
       
       return data;

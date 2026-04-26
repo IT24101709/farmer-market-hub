@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { createStock } from '../services/stockService';
 
@@ -43,7 +44,35 @@ const AddStockScreen = ({ navigation }) => {
       }
     };
     loadCategories();
+
+    // Load draft
+    const loadDraft = async () => {
+      try {
+        const draftStr = await AsyncStorage.getItem('@add_stock_draft');
+        if (draftStr) {
+          const draft = JSON.parse(draftStr);
+          if (draft.vegetableName) setVegetableName(draft.vegetableName);
+          if (draft.quantity) setQuantity(draft.quantity);
+          if (draft.pricePerKg) setPricePerKg(draft.pricePerKg);
+          if (draft.expiryDate) setExpiryDate(draft.expiryDate);
+          if (draft.selectedCategory) setSelectedCategory(draft.selectedCategory);
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+    loadDraft();
   }, []);
+
+  // Auto-save draft
+  React.useEffect(() => {
+    const saveDraft = async () => {
+      const draft = { vegetableName, quantity, pricePerKg, expiryDate, selectedCategory };
+      await AsyncStorage.setItem('@add_stock_draft', JSON.stringify(draft));
+    };
+    const timer = setTimeout(saveDraft, 1000);
+    return () => clearTimeout(timer);
+  }, [vegetableName, quantity, pricePerKg, expiryDate, selectedCategory]);
 
   React.useEffect(() => {
     const fetchTrend = async () => {
@@ -82,7 +111,7 @@ const AddStockScreen = ({ navigation }) => {
       mediaTypes: ImagePicker.MediaTypeOptions.Images, // Correct usage for expo-image-picker v14+
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.5, // Reduced for performance
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -159,8 +188,11 @@ const AddStockScreen = ({ navigation }) => {
         type
       });
 
-      await createStock(formData);
+      await createStock(formData, token); // Ensure token is passed
       
+      // Clear draft on success
+      await AsyncStorage.removeItem('@add_stock_draft');
+
       Alert.alert('Success', 'Stock added successfully to the market!', [
         { text: 'OK', onPress: () => navigation.navigate('StockList') }
       ]);

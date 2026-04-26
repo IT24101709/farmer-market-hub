@@ -10,8 +10,10 @@ import {
   ScrollView
 } from 'react-native';
 import { getStockById, deleteStock } from '../services/stockService';
+import { AuthContext } from '../context/AuthContext';
 
 const StockDetailScreen = ({ route, navigation }) => {
+  const { token } = React.useContext(AuthContext);
   const { stockId } = route.params;
   const [stock, setStock] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ const StockDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchStockDetail = async () => {
       try {
-        const data = await getStockById(stockId);
+        const data = await getStockById(stockId, token);
         setStock(data);
       } catch (error) {
         console.error(error);
@@ -51,7 +53,7 @@ const StockDetailScreen = ({ route, navigation }) => {
           onPress: async () => {
             try {
               setDeleting(true);
-              await deleteStock(stockId);
+              await deleteStock(stockId, token);
               Alert.alert('Success', 'Stock removed successfully.');
               navigation.navigate('StockList');
             } catch (error) {

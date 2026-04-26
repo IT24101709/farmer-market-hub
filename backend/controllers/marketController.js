@@ -39,7 +39,8 @@ exports.getProducts = async (req, res) => {
         .populate('farmerId', 'name email profileDetails')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(Number(limit))
+        .lean(),
       Stock.countDocuments(filter)
     ]);
 
@@ -68,7 +69,7 @@ exports.getProductById = async (req, res) => {
       approvalStatus: 'Approved',
       status: 'Available',
       expiryDate: { $gt: new Date() }
-    }).populate('farmerId', 'name email profileDetails');
+    }).populate('farmerId', 'name email profileDetails').lean();
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found or unavailable' });
@@ -96,7 +97,8 @@ exports.getPublicProducts = async (req, res) => {
     const products = await Stock.find(filter)
       .populate('farmerId', 'name')
       .sort({ createdAt: -1 })
-      .limit(6);
+      .limit(6)
+      .lean();
 
     res.status(200).json(products);
   } catch (error) {

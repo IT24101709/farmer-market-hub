@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api/admin';
+import getEnvVars from '../config';
+
+const { apiUrl } = getEnvVars();
+const API_URL = `${apiUrl}/admin`;
 
 // Mock token for development - replace with actual token retrieval from AuthContext/AsyncStorage
 const getAuthHeaders = (token) => {

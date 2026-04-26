@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+import getEnvVars from '../config';
+
+const { apiUrl } = getEnvVars();
+const API_URL = apiUrl;
 
 export const getPublicProducts = async () => {
   try {

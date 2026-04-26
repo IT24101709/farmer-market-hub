@@ -7,13 +7,15 @@ const {
   getPendingFarmers,
   approveFarmer,
   rejectFarmer,
-  updateProfile
+  updateProfile,
+  refreshToken
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Public routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/refresh', refreshToken);
 
 // Protected routes
 router.get('/me', protect, getMe);

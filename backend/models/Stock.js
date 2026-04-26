@@ -46,10 +46,13 @@ const stockSchema = new mongoose.Schema({
   },
   visibility: {
     type: Boolean,
-    default: false
+    default: true
   }
 }, {
   timestamps: true
 });
+
+// Compound Index for performance tuning
+stockSchema.index({ farmerId: 1, vegetableName: 1, status: 1 });
 
 module.exports = mongoose.model('Stock', stockSchema);

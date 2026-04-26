@@ -7,11 +7,37 @@ const path = require('path');
 // Load env vars
 dotenv.config();
 
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const rateLimit = require('express-rate-limit');
+
 const app = express();
+
+// Security Headers
+app.use(helmet());
 
 // Body parser
 app.use(express.json());
 app.use(cors());
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS
+app.use(xss());
+
+// Rate Limiting Config
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiting to all /api routes
+app.use('/api', apiLimiter);
 
 // Serve static fields for uploaded images
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

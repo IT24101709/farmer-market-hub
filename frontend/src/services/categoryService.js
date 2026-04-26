@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api/categories';
+import getEnvVars from '../config';
+
+const { apiUrl } = getEnvVars();
+const API_URL = `${apiUrl}/categories`;
 
 const getAuthHeaders = (token) => {
   return {

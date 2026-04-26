@@ -2,11 +2,54 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-// Helper to generate JWT
-const generateToken = (id) => {
+// Helper to generate Access JWT (Short-lived)
+const generateAccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_key', {
-    expiresIn: '30d',
+    expiresIn: '15m', // 15 minutes
   });
+};
+
+// Helper to generate Refresh JWT (Long-lived)
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret', {
+    expiresIn: '7d', // 7 days
+  });
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public
+const refreshToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Refresh token required' });
+    }
+
+    jwt.verify(token, process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret', async (err, decoded) => {
+      if (err) {
+        return res.status(403).json({ message: 'Invalid or expired refresh token' });
+      }
+      
+      const user = await User.findById(decoded.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      if (user.status === 'Suspended') {
+        return res.status(403).json({ message: 'Account suspended' });
+      }
+
+      const newAccessToken = generateAccessToken(user._id);
+      // Optional: Generate a new refresh token here for rotation, but we'll stick to simple return
+      
+      res.json({ accessToken: newAccessToken });
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ message: 'Server error during token refresh' });
+  }
 };
 
 // @desc    Register new user
@@ -51,9 +94,9 @@ const registerUser = async (req, res) => {
         isApproved: user.isApproved
       };
       
-      // Only provide token if not a farmer awaiting approval
       if (!isFarmerAwaitingApproval) {
-        response.token = generateToken(user._id);
+        response.accessToken = generateAccessToken(user._id);
+        response.refreshToken = generateRefreshToken(user._id);
       }
       
       if (isFarmerAwaitingApproval) {
@@ -104,7 +147,8 @@ const loginUser = async (req, res) => {
         role: user.role,
         isApproved: user.isApproved,
         status: user.status,
-        token: generateToken(user._id)
+        accessToken: generateAccessToken(user._id),
+        refreshToken: generateRefreshToken(user._id)
       });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
@@ -263,7 +307,8 @@ const updateProfile = async (req, res) => {
         email: updatedUser.email,
         role: updatedUser.role,
         profileDetails: updatedUser.profileDetails,
-        token: generateToken(updatedUser._id)
+        accessToken: generateAccessToken(updatedUser._id),
+        refreshToken: generateRefreshToken(updatedUser._id)
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -282,4 +327,5 @@ module.exports = {
   approveFarmer,
   rejectFarmer,
   updateProfile,
+  refreshToken,
 };

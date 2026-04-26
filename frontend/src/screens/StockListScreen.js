@@ -10,27 +10,65 @@ import {
   TextInput,
   ScrollView
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMyStocks } from '../services/stockService';
+import { AuthContext } from '../context/AuthContext';
 
 const StockListScreen = ({ navigation }) => {
+  const { token } = React.useContext(AuthContext);
+  
   const [stocks, setStocks] = useState([]);
   const [filteredStocks, setFilteredStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('All'); // All, Available, Expired
   const [priceFilter, setPriceFilter] = useState('All'); // All, Under 100, 100-500, Over 500
   const [dateFilter, setDateFilter] = useState('All'); // All, Last 7 Days, Last 30 Days
 
-  const fetchStocks = async () => {
+  const fetchStocks = async (pageNum = 1, isRefresh = false) => {
     try {
-      const data = await getMyStocks();
-      setStocks(data);
-      applyFilters(data, searchQuery, filter, priceFilter, dateFilter);
+      if (!token) return;
+      
+      // Attempt to load from cache on initial load
+      if (pageNum === 1 && !isRefresh) {
+        const cached = await AsyncStorage.getItem('@my_stocks');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setStocks(parsed);
+          applyFilters(parsed, searchQuery, filter, priceFilter, dateFilter);
+        }
+      }
+
+      const data = await getMyStocks(token, pageNum, 20); // Limit is 20
+      
+      // Backend returns { stocks: [...], pagination: {...} }
+      const newStocks = data.stocks || [];
+      const totalPages = data.pagination?.totalPages || 1;
+      
+      let updatedStocks;
+      if (pageNum === 1) {
+        updatedStocks = newStocks;
+        // Save to cache
+        await AsyncStorage.setItem('@my_stocks', JSON.stringify(newStocks));
+      } else {
+        updatedStocks = [...stocks, ...newStocks];
+      }
+      
+      setStocks(updatedStocks);
+      applyFilters(updatedStocks, searchQuery, filter, priceFilter, dateFilter);
+      
+      setHasMore(pageNum < totalPages);
+      setPage(pageNum);
+      
     } catch (error) {
       console.error('Error fetching stocks:', error);
-      // Fallback empty data if server is down for now
-      setStocks([]);
+      // If network fails, we've already loaded the cache!
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -39,11 +77,11 @@ const StockListScreen = ({ navigation }) => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchStocks();
+      fetchStocks(1);
     });
-    fetchStocks();
+    fetchStocks(1);
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, token]);
 
   const applyFilters = (data, query, currentFilter, currentPriceFilter, currentDateFilter) => {
     let result = data;
@@ -110,7 +148,22 @@ const StockListScreen = ({ navigation }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchStocks();
+    fetchStocks(1, true);
+  };
+
+  const loadMore = () => {
+    if (hasMore && !loading && !refreshing) {
+      fetchStocks(page + 1);
+    }
+  };
+
+  const renderFooter = () => {
+    if (!hasMore) return null;
+    return (
+      <View style={{ paddingVertical: 20 }}>
+        <ActivityIndicator size="small" color="#4CAF50" />
+      </View>
+    );
   };
 
   const renderStockItem = ({ item }) => {
@@ -150,7 +203,7 @@ const StockListScreen = ({ navigation }) => {
     );
   };
 
-  if (loading && !refreshing) {
+  if (loading && !refreshing && page === 1) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#2E7D32" />
@@ -241,6 +294,9 @@ const StockListScreen = ({ navigation }) => {
           keyExtractor={(item) => item._id}
           refreshing={refreshing}
           onRefresh={onRefresh}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
           contentContainerStyle={styles.listContainer}
         />
       )}
