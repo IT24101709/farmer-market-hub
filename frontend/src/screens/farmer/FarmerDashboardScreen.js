@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
-import { AuthContext } from '../../../context/AuthContext';
-import { getDashboardInsights } from '../../../services/farmerService';
+import { AuthContext } from '../../context/AuthContext';
+import { getDashboardInsights } from '../../services/farmerService';
 import { useFocusEffect } from '@react-navigation/native';
 
 const FarmerDashboardScreen = ({ navigation }) => {

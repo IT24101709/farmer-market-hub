@@ -9,8 +9,8 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import { bulkAddStocks } from '../../../services/stockService';
-import { getCategories } from '../../../services/categoryService';
+import { bulkAddStocks } from '../../services/stockService';
+import { getCategories } from '../../services/categoryService';
 
 const BulkOperationsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
@@ -165,7 +165,7 @@ const BulkOperationsScreen = ({ navigation }) => {
           <Text style={styles.addButtonText}>+ Add Another Row</Text>
         </TouchableOpacity>
 
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity 

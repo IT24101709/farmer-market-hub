@@ -121,7 +121,6 @@ exports.updateStock = async (req, res) => {
       updatedVisibility = false;
     }
 
-    let updatedStatus = status || stock.status;
     let expDate = expiryDate ? new Date(expiryDate) : stock.expiryDate;
 
     // Auto set status = "Expired" if expiryDate < today
