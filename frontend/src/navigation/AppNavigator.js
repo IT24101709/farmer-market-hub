@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, AuthContext } from '../context/AuthContext';
+import { CartProvider } from '../context/CartContext';
 import { ActivityIndicator, View } from 'react-native';
 
 // Screens
@@ -19,6 +20,7 @@ import FarmerDashboardScreen from '../screens/farmer/FarmerDashboardScreen';
 import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
 import BulkOperationsScreen from '../screens/farmer/BulkOperationsScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
+import CartScreen from '../screens/customer/CartScreen';
 import LandingScreen from '../screens/public/LandingScreen';
 
 const Stack = createNativeStackNavigator();
@@ -68,6 +70,7 @@ const CustomerStack = () => (
     }}
   >
     <Stack.Screen name="Marketplace" component={MarketplaceScreen} options={{ title: 'Fresh Marketplace' }} />
+    <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'My Cart' }} />
   </Stack.Navigator>
 );
 
@@ -106,7 +109,9 @@ const MainNavigation = () => {
 const AppNavigator = () => {
   return (
     <AuthProvider>
-      <MainNavigation />
+      <CartProvider>
+        <MainNavigation />
+      </CartProvider>
     </AuthProvider>
   );
 };

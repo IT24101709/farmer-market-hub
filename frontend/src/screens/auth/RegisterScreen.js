@@ -28,16 +28,12 @@ const RegisterScreen = ({ navigation }) => {
   const { register } = useContext(AuthContext);
 
   const validateForm = () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+    if (!name.trim() || name.length < 2) {
+      Alert.alert('Error', 'Please enter a valid name (at least 2 characters)');
       return false;
     }
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
-      return false;
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email');
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return false;
     }
     if (password.length < 6) {
@@ -48,13 +44,15 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Error', 'Passwords do not match');
       return false;
     }
-    if (role === 'Farmer' && !businessName.trim()) {
-      Alert.alert('Error', 'Please enter your business name');
-      return false;
-    }
-    if (role === 'Farmer' && !phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
-      return false;
+    if (role === 'Farmer') {
+      if (!businessName.trim() || businessName.length < 3) {
+        Alert.alert('Error', 'Please enter a valid business name (at least 3 characters)');
+        return false;
+      }
+      if (!phone.trim() || !/^\d{10}$/.test(phone)) {
+        Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+        return false;
+      }
     }
     return true;
   };

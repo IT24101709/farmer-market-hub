@@ -12,6 +12,7 @@ import {
   SafeAreaView
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
+import { CartContext } from '../../context/CartContext';
 import { getMarketProducts } from '../../services/marketService';
 import getEnvVars from '../../config';
 
@@ -19,6 +20,7 @@ const { apiUrl } = getEnvVars();
 
 const MarketplaceScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
+  const { addToCart, cartItems } = useContext(CartContext);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -119,7 +121,7 @@ const MarketplaceScreen = ({ navigation }) => {
             <Text style={styles.quantityValue}>{item.quantity} kg</Text>
           </View>
 
-          <TouchableOpacity style={styles.buyButton}>
+          <TouchableOpacity style={styles.buyButton} onPress={() => addToCart(item)}>
             <Text style={styles.buyButtonText}>Add to Cart</Text>
           </TouchableOpacity>
         </View>
@@ -134,9 +136,14 @@ const MarketplaceScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>Fresh Market</Text>
           <Text style={styles.headerSubtitle}>Discover local produce</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')}>
+            <Text style={styles.cartText}>Cart ({cartItems.length})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -198,6 +205,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#757575',
     marginTop: 2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cartBtn: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  cartText: {
+    color: '#1976D2',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   logoutBtn: {
     backgroundColor: '#FFEBEE',

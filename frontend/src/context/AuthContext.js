@@ -81,11 +81,8 @@ export const AuthProvider = ({ children }) => {
         if (data.refreshToken) await AsyncStorage.setItem('refreshToken', data.refreshToken);
         await AsyncStorage.setItem('userData', JSON.stringify(data));
       } else if (role === 'Farmer' && !data.isApproved) {
-        // For farmers awaiting approval, store their data but not the token
-        // This allows them to see their approval status
-        setUser(data);
-        await AsyncStorage.setItem('userData', JSON.stringify(data));
-        // Return the data with a message
+        // For farmers awaiting approval, do NOT set user state or token.
+        // This keeps them on the Registration screen so they can see the success message.
         return {
           ...data,
           message: data.message || 'Registration successful! Please wait for admin approval.'
