@@ -12,12 +12,13 @@ const {
   bulkAddStocks,
   bulkUpdateStocks
 } = require('../controllers/stockController');
+const { validateStockData } = require('../middleware/stockValidation');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 // Route mapping
 router.route('/')
-  .post(protect, upload.single('image'), createStock);
+  .post(protect, validateStockData, upload.single('image'), createStock);
 
 router.route('/my')
   .get(protect, getMyStocks);
@@ -31,7 +32,7 @@ router.route('/bulk/update')
 
 router.route('/:id')
   .get(protect, getStockById)
-  .put(protect, upload.single('image'), updateStock)
+  .put(protect, validateStockData, upload.single('image'), updateStock)
   .delete(protect, deleteStock);
 
 router.route('/:id/visibility')

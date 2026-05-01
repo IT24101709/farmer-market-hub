@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -12,22 +12,45 @@ import {
   Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { updateStock } from '../services/stockService';
+import { AuthContext } from '../context/AuthContext';
+import { updateStock, deleteStock, getStockById } from '../services/stockService';
 
 const EditStockScreen = ({ route, navigation }) => {
-  const { stock } = route.params;
+  const { stockId } = route.params;
+  const { token } = useContext(AuthContext);
+  const [stock, setStock] = useState(null);
+  const [newQuantity, setNewQuantity] = useState('');
+  const [newPricePerKg, setNewPricePerKg] = useState('');
+  const [status, setStatus] = useState('Available');
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
-  // Format date to YYYY-MM-DD
-  const formattedDate = new Date(stock.expiryDate).toISOString().split('T')[0];
+  useEffect(() => {
+    const fetchStock = async () => {
+      try {
+        const fetchedStock = await getStockById(stockId, token);
+        setStock(fetchedStock);
+        setNewQuantity(fetchedStock.quantity.toString());
+        setNewPricePerKg(fetchedStock.pricePerKg.toString());
+        setStatus(fetchedStock.status);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to load stock');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStock();
+  }, [stockId, token]);
 
-  const [vegetableName, setVegetableName] = useState(stock.vegetableName);
-  const [quantity, setQuantity] = useState(stock.quantity.toString());
-  const [pricePerKg, setPricePerKg] = useState(stock.pricePerKg.toString());
-  const [expiryDate, setExpiryDate] = useState(formattedDate);
-  const [status, setStatus] = useState(stock.status);
+  if (loading || !stock) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
   
   const [newImage, setNewImage] = useState(null); // Local new image if selected
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   const originalImageUrl = stock.image.startsWith('http') 
@@ -82,25 +105,37 @@ const EditStockScreen = ({ route, navigation }) => {
     return isValid;
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      Alert.alert('Error', 'Please check the input fields.');
+  const handleQtyZero = () => {
+    Alert.alert(
+      '⚠️ QUANTITY ZERO DETECTED',
+      'This stock will be automatically removed from your listing.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm & Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteStock(stock._id, token);
+              Alert.alert('Removed', 'Stock removed and moved to history.');
+              navigation.navigate('StockList');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to remove stock.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUpdate = async () => {
+    const qty = Number(newQuantity);
+    if (qty <= 0) {
+      handleQtyZero();
       return;
     }
-
-    // Confirmation if quantity is 0
-    if (Number(quantity) === 0) {
-      Alert.alert(
-        "Remove Stock?", 
-        "Setting quantity to 0 will remove this stock entirely from your listings. Continue?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Update", onPress: proceedWithUpdate, style: "destructive" }
-        ]
-      );
-    } else {
-      proceedWithUpdate();
-    }
+    if (!validateForm()) return;
+    proceedWithUpdate();
   };
 
   const proceedWithUpdate = async () => {

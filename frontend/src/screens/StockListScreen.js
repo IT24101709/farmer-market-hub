@@ -27,7 +27,8 @@ const StockListScreen = ({ navigation }) => {
   const [hasMore, setHasMore] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('All'); // All, Available, Expired
+  const [filter, setFilter] = useState('Available'); // All, Available, Expired, Qty>0 default
+  const [showZeroQty, setShowZeroQty] = useState(false);
   const [priceFilter, setPriceFilter] = useState('All'); // All, Under 100, 100-500, Over 500
   const [dateFilter, setDateFilter] = useState('All'); // All, Last 7 Days, Last 30 Days
 
@@ -86,6 +87,11 @@ const StockListScreen = ({ navigation }) => {
   const applyFilters = (data, query, currentFilter, currentPriceFilter, currentDateFilter) => {
     let result = data;
     
+    // Auto-hide zero quantity stocks
+    if (!showZeroQty) {
+      result = result.filter(item => item.quantity > 0);
+    }
+    
     // Search by name
     if (query) {
       result = result.filter(item => 
@@ -97,6 +103,7 @@ const StockListScreen = ({ navigation }) => {
     if (currentFilter !== 'All') {
       result = result.filter(item => item.status === currentFilter);
     }
+    // Already filtered by previous steps
 
     // Filter by price
     if (currentPriceFilter !== 'All') {
@@ -167,37 +174,24 @@ const StockListScreen = ({ navigation }) => {
   };
 
   const renderStockItem = ({ item }) => {
-    const isAvailable = item.status === 'Available';
-    const imageUrl = item.image.startsWith('http') 
-        ? item.image 
-        : `http://localhost:5000${item.image}`;
-
     return (
       <TouchableOpacity 
-        style={styles.card}
+        style={styles.tableRow}
         onPress={() => navigation.navigate('StockDetail', { stockId: item._id })}
       >
-        <Image 
-          source={{ uri: imageUrl }} 
-          style={styles.cardImage} 
-          resizeMode="cover"
-        />
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.vegetableName}</Text>
-          <Text style={styles.cardPrice}>LKR {item.pricePerKg} / kg</Text>
-          <Text style={styles.cardSub}>Qty: {item.quantity} kg</Text>
-          
-          <View style={[
-            styles.statusBadge, 
-            { backgroundColor: isAvailable ? '#E8F5E9' : '#FFEBEE' }
-          ]}>
-            <Text style={[
-              styles.statusText, 
-              { color: isAvailable ? '#2E7D32' : '#C62828' }
-            ]}>
-              {item.status}
-            </Text>
-          </View>
+        <View style={styles.cell}>
+          <Text style={styles.cellText}>{item.vegetableName}</Text>
+        </View>
+        <View style={styles.cell}>
+          <Text style={styles.cellText}>{item.quantity}kg</Text>
+        </View>
+        <View style={styles.cell}>
+          <Text style={styles.cellText}>₹{item.pricePerKg}</Text>
+        </View>
+        <View style={styles.cell}>
+          <TouchableOpacity style={styles.editBtn}>
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -215,8 +209,21 @@ const StockListScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Stock Management</Text>
-        <Text style={styles.headerSubtitle}>Manage your vegetable harvest and sales</Text>
+        <Text style={styles.headerTitle}>My Stock List</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={[styles.headerBtn, styles.addBtn]}
+            onPress={() => navigation.navigate('AddStock')}
+          >
+            <Text style={styles.headerBtnText}>[+ Add New Stock]</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('StockList', { editMode: true })} // or multi-select mode
+          >
+            <Text style={styles.headerBtnText}>[Edit Stock]</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -292,12 +299,14 @@ const StockListScreen = ({ navigation }) => {
           data={filteredStocks}
           renderItem={renderStockItem}
           keyExtractor={(item) => item._id}
+          numColumns={1}
           refreshing={refreshing}
           onRefresh={onRefresh}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={styles.tableContainer}
+          ItemSeparatorComponent={() => <View style={styles.rowSeparator} />}
         />
       )}
 
@@ -311,7 +320,83 @@ const StockListScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
+    tableContainer: {
+      padding: 15,
+      paddingBottom: 100,
+    },
+    tableHeader: {
+      flexDirection: 'row',
+      backgroundColor: '#F5F5F5',
+      paddingVertical: 12,
+      paddingHorizontal: 15,
+      marginBottom: 8,
+    },
+    tableHeaderText: {
+      flex: 1,
+      fontWeight: 'bold',
+      color: '#333',
+      fontSize: 16,
+      textAlign: 'left',
+    },
+    tableRow: {
+      flexDirection: 'row',
+      backgroundColor: '#FFFFFF',
+      paddingVertical: 12,
+      paddingHorizontal: 15,
+      borderRadius: 8,
+      marginBottom: 8,
+      elevation: 1,
+    },
+    cell: {
+      flex: 1.5,
+      justifyContent: 'center',
+    },
+    cellLast: {
+      flex: 1,
+      alignItems: 'flex-end',
+    },
+    cellText: {
+      fontSize: 16,
+      color: '#333',
+    },
+    rowSeparator: {
+      height: 1,
+      backgroundColor: '#E0E0E0',
+      marginHorizontal: 15,
+    },
+    headerButtons: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 10,
+    },
+    headerBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 15,
+      backgroundColor: '#E0E0E0',
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    addBtn: {
+      backgroundColor: '#4CAF50',
+    },
+    headerBtnText: {
+      color: '#333',
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    editBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: '#2196F3',
+      borderRadius: 6,
+    },
+    editBtnText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: 12,
+    },
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',

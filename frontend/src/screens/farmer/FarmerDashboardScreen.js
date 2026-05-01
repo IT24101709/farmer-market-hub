@@ -71,7 +71,7 @@ const FarmerDashboardScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('StockList')}
           >
             <Text style={styles.gridItemIcon}>📋</Text>
-            <Text style={styles.gridItemText}>My Harvest</Text>
+            <Text style={styles.gridItemText}>Stock Management</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.gridItem} 
@@ -93,6 +93,20 @@ const FarmerDashboardScreen = ({ navigation }) => {
           >
             <Text style={styles.gridItemIcon}>👤</Text>
             <Text style={styles.gridItemText}>Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.gridItem} 
+            onPress={() => navigation.navigate('MyOrders')}
+          >
+            <Text style={styles.gridItemIcon}>📦</Text>
+            <Text style={styles.gridItemText}>Orders History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.gridItem} 
+            onPress={() => navigation.navigate('PaymentHistory')}
+          >
+            <Text style={styles.gridItemIcon}>💰</Text>
+            <Text style={styles.gridItemText}>Payments</Text>
           </TouchableOpacity>
         </View>
       </View>

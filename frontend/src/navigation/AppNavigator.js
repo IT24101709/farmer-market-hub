@@ -19,6 +19,9 @@ import ManageCategoriesScreen from '../screens/admin/ManageCategoriesScreen';
 import FarmerDashboardScreen from '../screens/farmer/FarmerDashboardScreen';
 import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
 import BulkOperationsScreen from '../screens/farmer/BulkOperationsScreen';
+import MyOrdersScreen from '../screens/farmer/MyOrdersScreen';
+import OrderDetailsScreen from '../screens/farmer/OrderDetailsScreen';
+import PaymentHistoryScreen from '../screens/farmer/PaymentHistoryScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 import CartScreen from '../screens/customer/CartScreen';
 import LandingScreen from '../screens/public/LandingScreen';
@@ -41,6 +44,9 @@ const FarmerStack = () => (
     <Stack.Screen name="EditStock" component={EditStockScreen} options={{ title: 'Edit Stock' }} />
     <Stack.Screen name="FarmerProfile" component={FarmerProfileScreen} options={{ title: 'My Profile' }} />
     <Stack.Screen name="BulkOperations" component={BulkOperationsScreen} options={{ title: 'Bulk Operations' }} />
+    <Stack.Screen name="MyOrders" component={MyOrdersScreen} options={{ title: 'My Orders' }} />
+    <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ title: 'Order Details' }} />
+    <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Payments' }} />
   </Stack.Navigator>
 );
 

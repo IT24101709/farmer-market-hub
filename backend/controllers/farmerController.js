@@ -1,4 +1,6 @@
 const Stock = require('../models/Stock');
+const Order = require('../models/Order');
+const User = require('../models/User');
 
 // @desc    Get dashboard insights for farmer
 // @route   GET /api/farmer/insights
@@ -54,7 +56,6 @@ exports.getDashboardInsights = async (req, res) => {
     });
 
     // Turnover rate calculation (simplified mockup)
-    // We'll calculate: (Out of Stock count) / (Total stock records) * 100
     const totalStocks = await Stock.countDocuments({ farmerId });
     const outOfStockCount = await Stock.countDocuments({ farmerId, status: 'Out of Stock' });
     
@@ -119,6 +120,60 @@ exports.getPriceTrends = async (req, res) => {
       }))
     });
 
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get farmer's orders
+// @route   GET /api/farmer/orders
+// @access  Private (Farmer only)
+exports.getMyOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({ farmerId: req.user.id })
+      .populate('customerId', 'name email')
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get order by ID
+// @route   GET /api/farmer/orders/:id
+// @access  Private (Farmer only)
+exports.getOrderById = async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, farmerId: req.user.id })
+      .populate('customerId', 'name email phone profileDetails');
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get payment history
+// @route   GET /api/farmer/payments
+// @access  Private (Farmer only)
+exports.getPaymentHistory = async (req, res) => {
+  try {
+    // Get all completed orders for this farmer as payments
+    const payments = await Order.find({ 
+      farmerId: req.user.id,
+      status: 'Completed'
+    }).sort({ updatedAt: -1 });
+    
+    const formatted = payments.map(order => ({
+      _id: order._id,
+      amount: order.totalAmount,
+      date: order.updatedAt,
+      status: order.paymentStatus || 'Paid'
+    }));
+    
+    res.json(formatted);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

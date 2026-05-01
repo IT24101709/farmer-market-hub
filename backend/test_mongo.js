@@ -1,17 +1,14 @@
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
 
-const uri = "mongodb+srv://Vishmi:Vishmi%40123@vishmi.nsgdjhn.mongodb.net/?retryWrites=true&w=majority&appName=Vishmi";
+const uri = 'mongodb+srv://wmt:Vishmi%40123@ac-bzuxayh.l6d3u1d.mongodb.net/test?retryWrites=true&w=majority';
 
-const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
-
-async function run() {
-  try {
-    await client.connect();
-    console.log("Connected successfully to server");
-  } catch (err) {
-    console.dir(err);
-  } finally {
-    await client.close();
-  }
-}
-run().catch(console.dir);
+mongoose.connect(uri)
+  .then(() => {
+    console.log('✅ Connected to Atlas!');
+    mongoose.disconnect();
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('❌ Connection failed:', err.message);
+    process.exit(1);
+  });

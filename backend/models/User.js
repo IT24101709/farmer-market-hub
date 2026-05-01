@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Active', 'Suspended'],
+    enum: ['Active', 'Suspended', 'Blocked', 'Pending Approval'],
     default: 'Active'
   },
   // Farmer approval by admin
@@ -35,11 +35,48 @@ const userSchema = new mongoose.Schema({
       return this.role === 'Farmer' ? false : true; // Farmers need approval, others are auto-approved
     }
   },
-  // Additional details can be added later (address, phone, business name for farmers)
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  suspendedUntil: {
+    type: Date,
+    default: null
+  },
+  stockFrozenUntil: {
+    type: Date,
+    default: null  // FSM-04: separate from account suspend
+  },
+  // Additional details
   profileDetails: {
-    phone: String,
-    address: String,
-    businessName: String // For farmers
+    contactPerson: {
+      type: String,
+      trim: true
+    },
+    region: {
+      type: String,
+      enum: ['North', 'South', 'East', 'West', 'Central'],
+      trim: true
+    },
+    maxStockLimit: {
+      type: Number,
+      default: 100
+    },
+    phone: {
+      type: String,
+      trim: true,
+      maxlength: 15
+    },
+    address: {
+      type: String,
+      trim: true,
+      maxlength: 200
+    },
+    businessName: { // For farmers
+      type: String,
+      trim: true,
+      maxlength: 100
+    }
   }
 }, {
   timestamps: true

@@ -57,16 +57,53 @@ const refreshToken = async (req, res) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, profileDetails } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Please add all required fields' });
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ message: '❌ Please fill in all required fields (*).' });
+    }
+
+    if (role !== 'Farmer' && role !== 'Customer') {
+      return res.status(400).json({ message: '❌ Role must be either Farmer or Customer.' });
+    }
+
+    if (!/^[a-zA-Z\s]{3,50}$/.test(name)) {
+      return res.status(400).json({ message: '❌ Full Name must be 3-50 characters with no special symbols.' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: '❌ Please enter a valid email address.' });
+    }
+
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({ message: '❌ Password must contain 8+ chars, uppercase, number & symbol.' });
+    }
+
+    const phone = profileDetails?.phone || '';
+    if (!phone || !/^\d{10,15}$/.test(phone)) {
+      return res.status(400).json({ message: '❌ Enter a valid 10-digit mobile number.' });
+    }
+
+    if (role === 'Farmer') {
+      const businessName = profileDetails?.businessName || '';
+      if (!businessName || businessName.length > 100) {
+        return res.status(400).json({ message: '❌ Farm Name is required and must be under 100 characters.' });
+      }
+    }
+
+    if (role === 'Customer') {
+      const address = profileDetails?.address || '';
+      if (address && address.length > 200) {
+        return res.status(400).json({ message: '❌ Address must be under 200 characters.' });
+      }
     }
 
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: '❌ A user with this email already exists.' });
     }
 
     // Hash password
@@ -79,7 +116,8 @@ const registerUser = async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role: userRole
+      role: userRole,
+      profileDetails
     });
 
     if (user) {
@@ -118,10 +156,15 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
-    // Check for user email
-    const user = await User.findOne({ email });
+    // Check for user by email OR phone
+    const user = await User.findOne({ 
+      $or: [
+        { email: identifier },
+        { 'profileDetails.phone': identifier }
+      ]
+    });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       // Check if user is suspended
@@ -223,7 +266,7 @@ const approveFarmer = async (req, res) => {
     await farmer.save();
 
     res.json({
-      message: 'Farmer approved successfully',
+      message: `✅ Farmer ${farmer.name} has been approved. They can now log in.`,
       farmer: {
         _id: farmer._id,
         name: farmer.name,
@@ -266,7 +309,7 @@ const rejectFarmer = async (req, res) => {
     await User.findByIdAndDelete(farmerId);
 
     res.json({
-      message: 'Farmer rejected and account deleted',
+      message: `❌ Farmer ${farmer.name} has been rejected. Reason sent via email.`,
       rejectionReason: reason || 'No reason provided'
     });
   } catch (error) {
@@ -319,6 +362,58 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// @desc    Create admin account (only if no admin exists)
+// @route   POST /api/auth/setup-admin
+// @access  Public (but only works if no admin exists)
+const createAdminSetup = async (req, res) => {
+  try {
+    // Check if admin already exists
+    const adminExists = await User.findOne({ role: 'Admin' });
+    if (adminExists) {
+      return res.status(403).json({ message: '❌ Admin account already exists. Cannot create another.' });
+    }
+
+    const { email, password, name } = req.body;
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: '❌ Email, password, and name are required.' });
+    }
+
+    // Check if user with this email exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: '❌ User with this email already exists.' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create admin user
+    const admin = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: 'Admin',
+      isApproved: true,
+      status: 'Active'
+    });
+
+    res.status(201).json({
+      message: '✅ Admin account created successfully!',
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role
+      }
+    });
+  } catch (error) {
+    console.error('Admin setup error:', error);
+    res.status(500).json({ message: 'Server error creating admin account', error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -328,4 +423,5 @@ module.exports = {
   rejectFarmer,
   updateProfile,
   refreshToken,
+  createAdminSetup
 };

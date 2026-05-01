@@ -24,7 +24,8 @@ const AddStockScreen = ({ navigation }) => {
   const [vegetableName, setVegetableName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [pricePerKg, setPricePerKg] = useState('');
-  const [expiryDate, setExpiryDate] = useState(''); // Simple text fallback for dates, better to use DateTimePicker in production
+  const [harvestDate, setHarvestDate] = useState('');
+  const [status, setStatus] = useState('Available');
   const [image, setImage] = useState(null);
   
   const [categories, setCategories] = useState([]);
@@ -54,7 +55,8 @@ const AddStockScreen = ({ navigation }) => {
           if (draft.vegetableName) setVegetableName(draft.vegetableName);
           if (draft.quantity) setQuantity(draft.quantity);
           if (draft.pricePerKg) setPricePerKg(draft.pricePerKg);
-          if (draft.expiryDate) setExpiryDate(draft.expiryDate);
+          if (draft.harvestDate) setHarvestDate(draft.harvestDate);
+          if (draft.status) setStatus(draft.status);
           if (draft.selectedCategory) setSelectedCategory(draft.selectedCategory);
         }
       } catch (err) {
@@ -72,7 +74,7 @@ const AddStockScreen = ({ navigation }) => {
     };
     const timer = setTimeout(saveDraft, 1000);
     return () => clearTimeout(timer);
-  }, [vegetableName, quantity, pricePerKg, expiryDate, selectedCategory]);
+  }, [vegetableName, quantity, pricePerKg, harvestDate, status, selectedCategory]);
 
   React.useEffect(() => {
     const fetchTrend = async () => {
@@ -138,15 +140,22 @@ const AddStockScreen = ({ navigation }) => {
       isValid = false;
     }
 
-    if (!expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
-      newErrors.expiryDate = 'Please enter date in YYYY-MM-DD format';
+    if (!harvestDate || !/^\d{4}-\d{2}-\d{2}$/.test(harvestDate)) {
+      newErrors.harvestDate = 'Please enter harvest date in YYYY-MM-DD format';
       isValid = false;
     } else {
-      const expDate = new Date(expiryDate);
-      if (expDate < new Date()) {
-        newErrors.expiryDate = 'Expiry date cannot be in the past';
+      const harvest = new Date(harvestDate);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      if (harvest > today) {
+        newErrors.harvestDate = 'Harvest date cannot be in the future';
         isValid = false;
       }
+    }
+
+    if (Number(pricePerKg) < 10 || Number(pricePerKg) > 500) {
+      newErrors.pricePerKg = 'Price must be between ₹10 - ₹500 per kg';
+      isValid = false;
     }
 
     if (!image) {
@@ -174,7 +183,8 @@ const AddStockScreen = ({ navigation }) => {
       formData.append('vegetableName', vegetableName);
       formData.append('quantity', quantity);
       formData.append('pricePerKg', pricePerKg);
-      formData.append('expiryDate', expiryDate);
+      formData.append('harvestDate', harvestDate);
+      formData.append('status', status);
       
       // Append image
       const localUri = image.uri;
@@ -188,17 +198,34 @@ const AddStockScreen = ({ navigation }) => {
         type
       });
 
-      await createStock(formData, token); // Ensure token is passed
+      const response = await createStock(formData, token);
       
-      // Clear draft on success
+      // Clear draft
       await AsyncStorage.removeItem('@add_stock_draft');
 
-      Alert.alert('Success', 'Stock added successfully to the market!', [
-        { text: 'OK', onPress: () => navigation.navigate('StockList') }
+      Alert.alert('Success', 'Stock added to market!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
       console.error('Submit error:', error);
-      Alert.alert('Error', error.message || 'Failed to add stock. Please try again.');
+      const errorMsg = error.message || 'Failed to add stock';
+      if (errorMsg.includes('limit') || errorMsg.includes('exceed')) {
+        Alert.alert(
+          '❌ ERROR: Price exceeds limit',
+          `Maximum price for ${vegetableName}: ₹40\nYou entered: ₹${pricePerKg}`,
+          [
+            { text: 'Go Back to Edit', onPress: () => {} },
+            { text: 'Clear Form', onPress: () => {
+              setVegetableName('');
+              setQuantity('');
+              setPricePerKg('');
+              setHarvestDate('');
+            }}
+          ]
+        );
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -207,8 +234,8 @@ const AddStockScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Add New Harvest</Text>
-        <Text style={styles.headerSubtitle}>List your freshly harvested vegetables</Text>
+      <Text style={styles.headerTitle}>ADD NEW VEGETABLE</Text>
+        <Text style={styles.headerSubtitle}>Fresh produce for the marketplace</Text>
       </View>
 
       <View style={styles.formContainer}>
@@ -291,17 +318,37 @@ const AddStockScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Estimated Expiry Date *</Text>
+          <Text style={styles.label}>Harvest Date *</Text>
           <TextInput
-            style={[styles.input, errors.expiryDate && styles.inputError]}
+            style={[styles.input, errors.harvestDate && styles.inputError]}
             placeholder="YYYY-MM-DD"
-            value={expiryDate}
+            value={harvestDate}
             onChangeText={(text) => {
-              setExpiryDate(text);
-              if (errors.expiryDate) setErrors({...errors, expiryDate: null});
+              setHarvestDate(text);
+              if (errors.harvestDate) setErrors({...errors, harvestDate: null});
             }}
           />
-          {errors.expiryDate && <Text style={styles.errorText}>{errors.expiryDate}</Text>}
+          {errors.harvestDate && <Text style={styles.errorText}>{errors.harvestDate}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Availability</Text>
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={[styles.radioBtn, status === 'Available' && styles.radioBtnSelected]}
+              onPress={() => setStatus('Available')}
+            >
+              <View style={styles.radioIcon}>○</View>
+              <Text style={styles.radioLabel}>Available</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.radioBtn, status === 'Coming Soon' && styles.radioBtnSelected]}
+              onPress={() => setStatus('Coming Soon')}
+            >
+              <View style={styles.radioIcon}>○</View>
+              <Text style={styles.radioLabel}>Coming Soon</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.imageSection}>
@@ -323,23 +370,85 @@ const AddStockScreen = ({ navigation }) => {
           {errors.image && <Text style={styles.errorText}>{errors.image}</Text>}
         </View>
 
-        <TouchableOpacity 
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.submitButtonText}>Add to Market</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity 
+            style={styles.cancelBtn}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Submit Stock</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
+    radioGroup: {
+      flexDirection: 'row',
+      gap: 20,
+      marginTop: 10,
+    },
+    radioBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      backgroundColor: '#F9FAFB',
+    },
+    radioBtnSelected: {
+      borderColor: '#4CAF50',
+      backgroundColor: '#E8F5E9',
+    },
+    radioIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: '#757575',
+      backgroundColor: 'transparent',
+      marginRight: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    radioLabel: {
+      fontSize: 16,
+      color: '#333',
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 20,
+    },
+    cancelBtn: {
+      flex: 1,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      backgroundColor: '#F5F5F5',
+      borderRadius: 8,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+    },
+    cancelBtnText: {
+      color: '#666',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',

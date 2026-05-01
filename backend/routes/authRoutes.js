@@ -8,7 +8,8 @@ const {
   approveFarmer,
   rejectFarmer,
   updateProfile,
-  refreshToken
+  refreshToken,
+  createAdminSetup
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -16,6 +17,7 @@ const { protect } = require('../middleware/authMiddleware');
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/refresh', refreshToken);
+router.post('/setup-admin', createAdminSetup); // Setup endpoint for initial admin creation
 
 // Protected routes
 router.get('/me', protect, getMe);

@@ -88,8 +88,59 @@ if (require.main === module) {
     }
   };
 
-  connectDB()
-    .then(() => {
+connectDB()
+    .then(async () => {
+      // Seed users on first connection
+      const User = require('./models/User');
+      const bcrypt = require('bcryptjs');
+      
+      const adminExists = await User.findOne({ role: 'Admin' });
+      if (!adminExists) {
+        const salt = await bcrypt.genSalt(10);
+        await User.create({
+          name: 'Admin',
+          email: 'admin@farmersmarket.com',
+          password: await bcrypt.hash('admin123', salt),
+          role: 'Admin',
+          isApproved: true
+        });
+        console.log('✅ Admin seeded');
+      }
+      
+      const farmerExists = await User.findOne({ email: 'farmer@test.com' });
+      if (!farmerExists) {
+        const salt = await bcrypt.genSalt(10);
+        await User.create({
+          name: 'Test Farmer',
+          email: 'farmer@test.com',
+          password: await bcrypt.hash('Farmer123@', salt),
+          role: 'Farmer',
+          isApproved: true,
+          profileDetails: { phone: '0712345678', businessName: 'Test Farm' }
+        });
+        console.log('✅ Farmer seeded');
+      }
+      
+      const customerExists = await User.findOne({ email: 'customer@test.com' });
+      if (!customerExists) {
+        const salt = await bcrypt.genSalt(10);
+        await User.create({
+          name: 'Test Customer',
+          email: 'customer@test.com',
+          password: await bcrypt.hash('Customer123@', salt),
+          role: 'Customer',
+          isApproved: true
+        });
+        console.log('✅ Customer seeded');
+      }
+      
+      console.log('========================================');
+      console.log('🎉 USERS READY:');
+      console.log('Admin: admin@farmersmarket.com / admin123');
+      console.log('Farmer: farmer@test.com / Farmer123@');
+      console.log('Customer: customer@test.com / Customer123@');
+      console.log('========================================');
+      
       app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     })
     .catch(() => {

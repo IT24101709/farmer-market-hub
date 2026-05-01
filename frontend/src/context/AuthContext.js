@@ -32,12 +32,12 @@ export const AuthProvider = ({ children }) => {
     loadUserData();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (identifier, password) => {
     try {
       const response = await fetch(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
       const data = await response.json();
       
@@ -58,17 +58,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, role) => {
+  const register = async (name, email, password, role, profileDetails = {}) => {
     try {
+      console.log('📝 Registering user:', { name, email, role });
+      
+      const payload = { name, email, password, role, profileDetails };
+      console.log('📨 Sending registration request to:', `${API_URL}/register`);
+      
       const response = await fetch(`${API_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify(payload),
       });
+      
       const data = await response.json();
+      console.log('📥 Server response status:', response.status);
+      console.log('📥 Server response data:', data);
       
       if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
+        const errorMessage = data.message || data.error || 'Registration failed';
+        console.error('❌ Registration failed - Status:', response.status, 'Message:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       // Only set token and user if farmer is approved or not a farmer
@@ -80,17 +90,21 @@ export const AuthProvider = ({ children }) => {
         await AsyncStorage.setItem('userToken', tokenToStore);
         if (data.refreshToken) await AsyncStorage.setItem('refreshToken', data.refreshToken);
         await AsyncStorage.setItem('userData', JSON.stringify(data));
+        console.log('✅ User data stored in AsyncStorage');
       } else if (role === 'Farmer' && !data.isApproved) {
         // For farmers awaiting approval, do NOT set user state or token.
         // This keeps them on the Registration screen so they can see the success message.
+        console.log('⏳ Farmer registration pending approval');
         return {
           ...data,
           message: data.message || 'Registration successful! Please wait for admin approval.'
         };
       }
       
+      console.log('✅ Registration complete');
       return data;
     } catch (error) {
+      console.error('❌ Registration error:', error);
       throw error;
     }
   };

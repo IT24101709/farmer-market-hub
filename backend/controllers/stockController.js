@@ -1,5 +1,6 @@
 const Stock = require('../models/Stock');
 const StockHistory = require('../models/StockHistory');
+const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
 
@@ -8,54 +9,77 @@ const path = require('path');
 // @access  Private (Farmer only)
 exports.createStock = async (req, res) => {
   try {
-    const { vegetableName, quantity, pricePerKg, expiryDate, categoryId } = req.body;
+    // Validation middleware already ran, use req.validatedData
+    const { vegetableName, harvestDate, quantity, pricePerKg, expiryDate, categoryId } = req.validatedData || req.body;
+    const { minPriceLimit, maxPriceLimit } = req.stockLimits || {};
 
     if (!req.file) {
-      return res.status(400).json({ message: 'Image is required' });
+      return res.status(400).json({ message: '❌ Image is required' });
     }
 
     const imagePath = `/uploads/${req.file.filename}`;
 
     const newStock = new Stock({
-      farmerId: req.user.id, // Assuming authMiddleware sets req.user
+      farmerId: req.user.id,
       categoryId: categoryId || undefined,
       vegetableName,
+      harvestDate,
       quantity,
       pricePerKg,
-      expiryDate,
-      image: imagePath
+      minPriceLimit: minPriceLimit || 0,
+      maxPriceLimit: maxPriceLimit || Infinity,
+      expiryDate: new Date(expiryDate),
+      image: imagePath,
+status: 'Available'  // Auto-listed for demo
     });
 
     const savedStock = await newStock.save();
 
-    await StockHistory.create({
-      stockId: savedStock._id,
+    // Audit log with IP/userAgent (from middleware or req)
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
       userId: req.user.id,
-      action: 'CREATED',
-      changes: { quantity, pricePerKg, status: 'Available' }
+      stockId: savedStock._id,
+      action: 'STOCK_CREATED',
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent'),
+      details: { vegetableName, quantity, pricePerKg: `₹${pricePerKg}` }
     });
 
-    res.status(201).json(savedStock);
+    res.status(201).json({ 
+      message: `✅ Stock for ${vegetableName} created successfully. Awaiting admin approval.`,
+      stock: savedStock 
+    });
   } catch (error) {
+    console.error('Create stock error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Get all stocks for logged-in farmer with pagination
+// @desc    Get all stocks for logged-in farmer with pagination (exclude deleted)
 // @route   GET /api/stocks/my
 // @access  Private
 exports.getMyStocks = async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, status, lowStock } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
+    let query = { 
+      farmerId: req.user.id, 
+      isDeleted: false 
+    };
+
+    if (status) query.status = status;
+    if (lowStock === 'true') query.quantity = { $lt: 10 };
+
     const [stocks, total] = await Promise.all([
-      Stock.find({ farmerId: req.user.id })
+      Stock.find(query)
+        .populate('categoryId', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
         .lean(),
-      Stock.countDocuments({ farmerId: req.user.id })
+      Stock.countDocuments(query)
     ]);
 
     res.status(200).json({
@@ -99,74 +123,106 @@ exports.getStockById = async (req, res) => {
 // @access  Private
 exports.updateStock = async (req, res) => {
   try {
-    const { vegetableName, quantity, pricePerKg, expiryDate, status } = req.body;
+    // Validation middleware already ran for changed fields
+    const validatedData = req.validatedData;
+    const changedFields = {};
 
-    let stock = await Stock.findById(req.params.id);
+    let stock = await Stock.findById(req.params.id).populate('categoryId');
 
     if (!stock) {
-      return res.status(404).json({ message: 'Stock not found' });
+      return res.status(404).json({ message: '❌ Stock not found' });
     }
 
-    // Check if it belongs to farmer
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(401).json({ message: '❌ Not authorized' });
     }
 
-    // Assignment requirement: if quantity = 0 -> availability = false (status Out of Stock)
-    let updatedStatus = status || stock.status;
-    let updatedVisibility = stock.visibility;
-
-    if (quantity !== undefined && Number(quantity) <= 0) {
-      updatedStatus = 'Out of Stock';
-      updatedVisibility = false;
+    if (stock.isDeleted) {
+      return res.status(400).json({ message: '❌ Cannot update deleted stock. Use admin restore.' });
     }
 
-    let expDate = expiryDate ? new Date(expiryDate) : stock.expiryDate;
+    // Apply validated updates
+    if (validatedData) {
+      if (validatedData.vegetableName !== undefined) stock.vegetableName = validatedData.vegetableName;
+      if (validatedData.harvestDate !== undefined) stock.harvestDate = validatedData.harvestDate;
+      if (validatedData.quantity !== undefined) {
+        stock.quantity = validatedData.quantity;
+        changedFields.oldQuantity = stock.quantity;
+        changedFields.newQuantity = validatedData.quantity;
+      }
+      if (validatedData.pricePerKg !== undefined) {
+        stock.pricePerKg = validatedData.pricePerKg;
+        changedFields.oldPrice = stock.pricePerKg;
+        changedFields.newPrice = validatedData.pricePerKg;
+      }
+      if (req.stockLimits) {
+        stock.minPriceLimit = req.stockLimits.minPriceLimit;
+        stock.maxPriceLimit = req.stockLimits.maxPriceLimit;
+      }
+    }
 
-    // Auto set status = "Expired" if expiryDate < today
-    if (expDate < new Date()) {
-      updatedStatus = 'Expired';
+    // Other fields
+    const { expiryDate, status, visibility } = req.body;
+    if (expiryDate !== undefined) {
+      stock.expiryDate = new Date(expiryDate);
+    }
+    if (status !== undefined) {
+      stock.status = status;
+    }
+
+    // Auto logic
+    const now = new Date();
+    if (stock.expiryDate < now) {
+      stock.status = 'Expired';
+      stock.visibility = false;
+    }
+    if (stock.quantity === 0) {
+      stock.status = 'Out of Stock';
+      stock.visibility = false;
+    } else if (stock.quantity < 10) {
+      stock.status = 'Low Stock';
     }
 
     let newImage = stock.image;
     if (req.file) {
       newImage = `/uploads/${req.file.filename}`;
-      // Remove old image
-      if (stock.image) {
+      if (stock.image && stock.image !== newImage) {
+        const fs = require('fs');
+        const path = require('path');
         const filePath = path.join(__dirname, '..', stock.image);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
       }
     }
-
-    stock.vegetableName = vegetableName || stock.vegetableName;
-    stock.quantity = quantity !== undefined ? quantity : stock.quantity;
-    stock.pricePerKg = pricePerKg || stock.pricePerKg;
-    stock.expiryDate = expDate;
-    stock.status = updatedStatus;
-    stock.visibility = updatedVisibility;
     stock.image = newImage;
 
+    const oldStatus = stock.status;
     const updatedStock = await stock.save();
+    changedFields.newStatus = updatedStock.status;
 
-    await StockHistory.create({
-      stockId: updatedStock._id,
+    // Audit log
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
       userId: req.user.id,
-      action: 'UPDATED',
-      changes: {
-        quantity: { new: updatedStock.quantity },
-        status: { new: updatedStock.status }
-      }
+      stockId: updatedStock._id,
+      action: 'STOCK_UPDATED',
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent'),
+      details: changedFields
     });
 
-    res.status(200).json(updatedStock);
+    res.status(200).json({ 
+      message: `✅ Stock for ${updatedStock.vegetableName} updated from ${changedFields.oldQuantity || '?'} kg to ${updatedStock.quantity} kg.`,
+      stock: updatedStock 
+    });
   } catch (error) {
+    console.error('Update stock error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// @desc    Delete stock
+// @desc    Delete stock (farmer manual delete, hard delete if qty=0)
 // @route   DELETE /api/stocks/:id
 // @access  Private
 exports.deleteStock = async (req, res) => {
@@ -174,31 +230,43 @@ exports.deleteStock = async (req, res) => {
     const stock = await Stock.findById(req.params.id);
 
     if (!stock) {
-      return res.status(404).json({ message: 'Stock not found' });
+      return res.status(404).json({ message: '❌ Stock not found' });
     }
 
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(401).json({ message: '❌ Not authorized' });
     }
 
+    if (stock.isDeleted) {
+      return res.status(400).json({ message: '❌ Already deleted' });
+    }
+
+    // Image cleanup
     if (stock.image) {
+      const fs = require('fs');
+      const path = require('path');
       const filePath = path.join(__dirname, '..', stock.image);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     }
 
-    await Stock.findByIdAndDelete(req.params.id);
+    await Stock.findByIdAndDelete(stock._id);
 
-    await StockHistory.create({
-      stockId: stock._id,
+    // Audit
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
       userId: req.user.id,
-      action: 'DELETED',
-      changes: { deleted: true }
+      stockId: stock._id,
+      action: 'STOCK_DELETED_FARMER',
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent'),
+      details: { vegetableName: stock.vegetableName, reason: 'Farmer manual removal' }
     });
 
-    res.status(200).json({ message: 'Stock removed successfully' });
+    res.status(200).json({ message: `✅ Stock for ${stock.vegetableName} removed successfully.` });
   } catch (error) {
+    console.error('Delete stock error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -311,6 +379,11 @@ exports.bulkAddStocks = async (req, res) => {
     }
 
     const farmerId = req.user.id;
+    const farmer = await User.findById(farmerId);
+    if (farmer && farmer.status === 'Suspended') {
+      return res.status(403).json({ message: '❌ Your account is suspended. Contact admin.' });
+    }
+
     const stocksToInsert = stocks.map(stock => ({
       farmerId,
       categoryId: stock.categoryId || undefined,

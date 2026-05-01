@@ -3,16 +3,10 @@ services:
     name: farmers-market-hub-backend
     env: node
     plan: free
-    buildCommand: npm install
-    startCommand: node server.js
+    buildCommand: npm install && npm install mongodb-memory-server
+    startCommand: node run.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 5000
-      - key: MONGO_URI
-        sync: false # Must be set manually in Render Dashboard for security
-      - key: JWT_SECRET
-        sync: false # Must be set manually in Render Dashboard for security
-      - key: JWT_REFRESH_SECRET
-        sync: false # Must be set manually in Render Dashboard for security

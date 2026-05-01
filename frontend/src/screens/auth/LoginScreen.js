@@ -13,7 +13,8 @@ import {
 import { AuthContext } from '../../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
+const [usePhone, setUsePhone] = useState(false);
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loadingLocal, setLoadingLocal] = useState(false);
   const [approvalPendingModal, setApprovalPendingModal] = useState(false);
@@ -22,17 +23,24 @@ const LoginScreen = ({ navigation }) => {
   const { login } = useContext(AuthContext);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+    if (!identifier.trim() || !password) {
+      Alert.alert('Error', 'Please enter identifier and password');
       return;
     }
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
+    if (usePhone) {
+      if (!/^\d{10,15}$/.test(identifier)) {
+        Alert.alert('Error', 'Please enter a valid 10-15 digit phone number');
+        return;
+      }
+    } else {
+      if (!/^\S+@\S+\.\S+$/.test(identifier)) {
+        Alert.alert('Error', 'Please enter a valid email address');
+        return;
+      }
     }
     try {
       setLoadingLocal(true);
-      await login(email, password);
+      await login(identifier, password);
       // Navigation is handled by AppNavigator observing AuthContext state
     } catch (error) {
       // Check if error is due to farmer approval pending
@@ -64,12 +72,25 @@ const LoginScreen = ({ navigation }) => {
 
           <View style={styles.formSection}>
             <Text style={styles.label}>Email Address</Text>
+            {/* Toggle Button */}
+            <TouchableOpacity 
+              style={styles.toggleBtn} 
+              onPress={() => {
+                setUsePhone(!usePhone);
+                setIdentifier('');
+              }}
+            >
+              <Text style={styles.toggleBtnText}>
+                {usePhone ? '📧 Use Email' : '📱 Use Phone'}
+              </Text>
+            </TouchableOpacity>
+
             <TextInput
               style={styles.input}
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              placeholder={usePhone ? "Enter phone number" : "Enter your email"}
+              value={identifier}
+              onChangeText={setIdentifier}
+              keyboardType={usePhone ? "phone-pad" : "email-address"}
               autoCapitalize="none"
               placeholderTextColor="#999"
             />
@@ -157,7 +178,7 @@ const LoginScreen = ({ navigation }) => {
               style={styles.modalBtn}
               onPress={() => {
                 setApprovalPendingModal(false);
-                setEmail('');
+        setIdentifier('');
                 setPassword('');
               }}
             >
@@ -170,7 +191,22 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
+    toggleBtn: {
+      backgroundColor: '#e3f2fd',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: '#2196f3',
+    },
+    toggleBtnText: {
+      color: '#1976d2',
+      fontWeight: '600',
+      fontSize: 14,
+    },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',

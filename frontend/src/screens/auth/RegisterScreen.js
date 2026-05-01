@@ -21,6 +21,7 @@ const RegisterScreen = ({ navigation }) => {
   const [role, setRole] = useState('Customer');
   const [businessName, setBusinessName] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [loadingLocal, setLoadingLocal] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [registrationData, setRegistrationData] = useState(null);
@@ -28,32 +29,51 @@ const RegisterScreen = ({ navigation }) => {
   const { register } = useContext(AuthContext);
 
   const validateForm = () => {
-    if (!name.trim() || name.length < 2) {
-      Alert.alert('Error', 'Please enter a valid name (at least 2 characters)');
+    if (!name.trim() || !email.trim() || !password) {
+      Alert.alert('Error', '❌ Please fill in all required fields (*).');
       return false;
     }
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+
+    if (!/^[a-zA-Z\s]{3,50}$/.test(name.trim())) {
+      Alert.alert('Error', '❌ Full Name must be 3-50 characters with no special symbols.');
       return false;
     }
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Error', '❌ Please enter a valid email address.');
       return false;
     }
+
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      Alert.alert('Error', '❌ Password must contain 8+ chars, uppercase, number & symbol.');
+      return false;
+    }
+
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('Error', '❌ Passwords do not match.');
       return false;
     }
+
     if (role === 'Farmer') {
-      if (!businessName.trim() || businessName.length < 3) {
-        Alert.alert('Error', 'Please enter a valid business name (at least 3 characters)');
+      if (!businessName.trim() || businessName.length > 100) {
+        Alert.alert('Error', '❌ Farm Name is required and must be under 100 characters.');
         return false;
       }
-      if (!phone.trim() || !/^\d{10}$/.test(phone)) {
-        Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      if (!phone.trim() || !/^\d{10,15}$/.test(phone)) {
+        Alert.alert('Error', '❌ Enter a valid 10-digit mobile number.');
         return false;
       }
     }
+
+    if (role === 'Customer') {
+      if (address.trim() && address.length > 200) {
+        Alert.alert('Error', '❌ Address must be under 200 characters.');
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -62,11 +82,29 @@ const RegisterScreen = ({ navigation }) => {
 
     try {
       setLoadingLocal(true);
-      const result = await register(name, email, password, role);
+      console.log('🔄 Starting registration with role:', role);
+      
+      const result = await register(name, email, password, role, { businessName, phone, address });
+      console.log('✅ Registration result:', result);
+      
       setRegistrationData(result);
       setRegistrationComplete(true);
+      
+      if (role === 'Farmer' && !result.isApproved) {
+        console.log('🚜 Farmer account pending approval');
+        Alert.alert('✅ Registration Successful!', 'Your farmer account is created and pending admin approval.\nYou can try logging in once approved.', [
+          { text: 'OK', onPress: () => navigation.navigate('Login') }
+        ]);
+      } else {
+        console.log('✅ User account created and ready');
+        Alert.alert('✅ Registration Successful!', `Welcome ${name}! Your account is ready.`, [
+          { text: 'Login Now', onPress: () => navigation.navigate('Login') }
+        ]);
+      }
     } catch (error) {
-      Alert.alert('Registration Failed', error.message);
+      console.error('❌ Registration error:', error);
+      console.error('❌ Error message:', error.message);
+      Alert.alert('❌ Registration Failed', error.message || 'An error occurred during registration. Please try again.');
     } finally {
       setLoadingLocal(false);
     }
@@ -122,6 +160,7 @@ const RegisterScreen = ({ navigation }) => {
                   setRole('Customer');
                   setBusinessName('');
                   setPhone('');
+                  setAddress('');
                 }}
               >
                 <Text style={styles.secondaryBtnText}>Register Another Account</Text>
@@ -278,6 +317,19 @@ const RegisterScreen = ({ navigation }) => {
                 </Text>
               </View>
             </>
+          )}
+
+          {role === 'Customer' && (
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Address (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your address"
+                value={address}
+                onChangeText={setAddress}
+                placeholderTextColor="#999"
+              />
+            </View>
           )}
 
           <View style={styles.formSection}>
