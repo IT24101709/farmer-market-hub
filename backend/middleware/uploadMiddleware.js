@@ -11,19 +11,23 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter (only images)
+// File filter (only vegetable images: jpg, jpeg, png)
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || file.mimetype === 'image/jpg') {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+  const ext = path.extname(file.originalname || '').toLowerCase();
+
+  if (allowedTypes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Unsupported file format. Please upload jpg/png.'), false);
+    cb(new Error('Unsupported file format. Please upload jpg, jpeg, or png.'), false);
   }
 };
 
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 1024 * 1024 * 5 // 5MB limit
+    fileSize: 1024 * 1024 * 2 // 2MB limit
   },
   fileFilter: fileFilter
 });

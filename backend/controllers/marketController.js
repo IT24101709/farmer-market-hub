@@ -1,35 +1,47 @@
 const Stock = require('../models/Stock');
+const { CATEGORY_ENUM } = require('../utils/stockCategory');
 
-// @desc    Get all available marketplace products (visible, approved, not expired)
+const marketplaceFilter = () => {
+  const now = new Date();
+  return {
+    availabilityStatus: true,
+    approvalStatus: 'Approved',
+    visibility: true,
+    isDeleted: false,
+    quantity: { $gt: 0 },
+    status: { $nin: ['Expired', 'Out of Stock'] },
+    expiryDate: { $gt: now }
+  };
+};
+
+// @desc    Get all available marketplace products (listings from farmer stock)
 // @route   GET /api/market
 // @access  Private (Customer, Farmer, Admin)
 exports.getProducts = async (req, res) => {
   try {
-    const { search, minPrice, maxPrice, farmerId, page = 1, limit = 20 } = req.query;
+    const { search, minPrice, maxPrice, farmerId, category, page = 1, limit = 20 } = req.query;
 
-    // Base filter: only show marketplace-ready items
-    const filter = {
-      visibility: true,
-      approvalStatus: 'Approved',
-      status: 'Available',
-      expiryDate: { $gt: new Date() }
-    };
+    const filter = marketplaceFilter();
 
-    // Search by vegetable name (case-insensitive)
     if (search) {
-      filter.vegetableName = { $regex: search, $options: 'i' };
+      filter.name = { $regex: search, $options: 'i' };
     }
 
-    // Price range filter
     if (minPrice || maxPrice) {
       filter.pricePerKg = {};
       if (minPrice) filter.pricePerKg.$gte = Number(minPrice);
       if (maxPrice) filter.pricePerKg.$lte = Number(maxPrice);
     }
 
-    // Filter by specific farmer
     if (farmerId) {
       filter.farmerId = farmerId;
+    }
+
+    if (category) {
+      const c = String(category).toLowerCase().trim();
+      if (CATEGORY_ENUM.includes(c)) {
+        filter.category = c;
+      }
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -37,6 +49,7 @@ exports.getProducts = async (req, res) => {
     const [products, total] = await Promise.all([
       Stock.find(filter)
         .populate('farmerId', 'name email profileDetails')
+        .populate('categoryId', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -63,13 +76,15 @@ exports.getProducts = async (req, res) => {
 // @access  Private (Customer, Farmer, Admin)
 exports.getProductById = async (req, res) => {
   try {
+    const base = marketplaceFilter();
+
     const product = await Stock.findOne({
       _id: req.params.id,
-      visibility: true,
-      approvalStatus: 'Approved',
-      status: 'Available',
-      expiryDate: { $gt: new Date() }
-    }).populate('farmerId', 'name email profileDetails').lean();
+      ...base
+    })
+      .populate('farmerId', 'name email profileDetails')
+      .populate('categoryId', 'name')
+      .lean();
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found or unavailable' });
@@ -86,16 +101,11 @@ exports.getProductById = async (req, res) => {
 // @access  Public
 exports.getPublicProducts = async (req, res) => {
   try {
-    const filter = {
-      visibility: true,
-      approvalStatus: 'Approved',
-      status: 'Available',
-      expiryDate: { $gt: new Date() }
-    };
+    const filter = marketplaceFilter();
 
-    // Get a limited number of recent products (e.g., 6)
     const products = await Stock.find(filter)
       .populate('farmerId', 'name')
+      .populate('categoryId', 'name')
       .sort({ createdAt: -1 })
       .limit(6)
       .lean();

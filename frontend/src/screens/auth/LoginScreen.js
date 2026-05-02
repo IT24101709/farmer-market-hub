@@ -9,8 +9,17 @@ import {
   ActivityIndicator,
   ScrollView,
   Modal,
+  Platform,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
+
+const showMessage = (title, message) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
+};
 
 const LoginScreen = ({ navigation }) => {
 const [usePhone, setUsePhone] = useState(false);
@@ -23,24 +32,26 @@ const [usePhone, setUsePhone] = useState(false);
   const { login } = useContext(AuthContext);
 
   const handleLogin = async () => {
-    if (!identifier.trim() || !password) {
-      Alert.alert('Error', 'Please enter identifier and password');
+    const normalizedIdentifier = usePhone ? identifier.trim() : identifier.trim().toLowerCase();
+
+    if (!normalizedIdentifier || !password) {
+      showMessage('Error', 'Please enter identifier and password');
       return;
     }
     if (usePhone) {
-      if (!/^\d{10,15}$/.test(identifier)) {
-        Alert.alert('Error', 'Please enter a valid 10-15 digit phone number');
+      if (!/^\d{10,15}$/.test(normalizedIdentifier)) {
+        showMessage('Error', 'Please enter a valid 10-15 digit phone number');
         return;
       }
     } else {
-      if (!/^\S+@\S+\.\S+$/.test(identifier)) {
-        Alert.alert('Error', 'Please enter a valid email address');
+      if (!/^\S+@\S+\.\S+$/.test(normalizedIdentifier)) {
+        showMessage('Error', 'Please enter a valid email address');
         return;
       }
     }
     try {
       setLoadingLocal(true);
-      await login(identifier, password);
+      await login(normalizedIdentifier, password);
       // Navigation is handled by AppNavigator observing AuthContext state
     } catch (error) {
       // Check if error is due to farmer approval pending
@@ -49,12 +60,13 @@ const [usePhone, setUsePhone] = useState(false);
         error.message.includes('awaiting approval')
       ) {
         setPendingFarmerData({
-          email,
+          identifier: normalizedIdentifier,
           message: error.message,
         });
         setApprovalPendingModal(true);
       } else {
-        Alert.alert('Login Failed', error.message);
+        const msg = error?.message || String(error);
+        showMessage('Login Failed', msg);
       }
     } finally {
       setLoadingLocal(false);

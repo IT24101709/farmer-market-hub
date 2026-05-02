@@ -50,6 +50,7 @@ const farmerRoutes = require('./routes/farmerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stocks', stockRoutes);
@@ -58,6 +59,62 @@ app.use('/api/farmer', farmerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// =======================
+// Global Error Handler (NFR-03)
+// =======================
+app.use((err, req, res, next) => {
+  console.error('Unhandled Error:', err);
+  
+  // Handle Mongoose validation errors
+  if (err.name === 'ValidationError') {
+    const messages = Object.values(err.errors).map(e => e.message);
+    return res.status(400).json({ 
+      statusCode: 400, 
+      message: 'Validation Error', 
+      errors: messages 
+    });
+  }
+  
+  // Handle Mongoose CastError (invalid ObjectId)
+  if (err.name === 'CastError') {
+    return res.status(400).json({ 
+      statusCode: 400, 
+      message: 'Invalid ID format' 
+    });
+  }
+  
+  // Handle multer file upload errors
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ 
+      statusCode: 400, 
+      message: 'File too large. Max 2MB allowed.' 
+    });
+  }
+  
+  // Handle duplicate key error
+  if (err.code === 11000) {
+    return res.status(400).json({ 
+      statusCode: 400, 
+      message: 'Duplicate entry - this record already exists' 
+    });
+  }
+  
+  // Default error response (NFR-03: structured JSON with message and statusCode)
+  res.status(err.statusCode || 500).json({ 
+    statusCode: err.statusCode || 500, 
+    message: err.message || 'Internal Server Error' 
+  });
+});
+
+// 404 handler for unmatched routes
+app.use((req, res) => {
+  res.status(404).json({ 
+    statusCode: 404, 
+    message: 'Route not found' 
+  });
+});
 
 // Main Server Startup logic (if this file is run directly)
 if (require.main === module) {
@@ -73,7 +130,6 @@ if (require.main === module) {
     try {
       await mongoose.connect(uri, {
         family: 4,
-        tls: true,
         serverSelectionTimeoutMS: 30000,
       });
       console.log('MongoDB connected');
@@ -133,6 +189,13 @@ connectDB()
         });
         console.log('✅ Customer seeded');
       }
+
+      const {
+        ensureDefaultCategories,
+        migrateLegacyStockCategories
+      } = require('./utils/ensureCategories');
+      await migrateLegacyStockCategories();
+      await ensureDefaultCategories();
       
       console.log('========================================');
       console.log('🎉 USERS READY:');
@@ -140,8 +203,30 @@ connectDB()
       console.log('Farmer: farmer@test.com / Farmer123@');
       console.log('Customer: customer@test.com / Customer123@');
       console.log('========================================');
-      
-      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+      const { syncExpiredMarketListings } = require('./jobs/syncExpiredListings');
+      syncExpiredMarketListings()
+        .then((n) => {
+          if (n > 0) console.log(`📦 Marked ${n} expired stock row(s) off marketplace`);
+        })
+        .catch((e) => console.error('Expired listing sync failed:', e.message));
+      setInterval(() => {
+        syncExpiredMarketListings().catch((e) => console.error('Expired listing sync failed:', e.message));
+      }, 60 * 60 * 1000);
+
+      const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+      server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`\n❌ Port ${PORT} is already in use.`);
+          console.error(`   Free it: netstat -ano | findstr ":${PORT}"  then  taskkill /PID <pid> /F`);
+          console.error('   Dev API URL must match frontend: frontend/src/config.js (default http://localhost:5000/api).\n');
+        } else {
+          console.error(err);
+        }
+        process.exit(1);
+      });
     })
     .catch(() => {
       console.error('Startup aborted due to MongoDB connection failure.');

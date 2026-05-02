@@ -1,60 +1,318 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useCallback, useContext, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
+import { confirmFarmerOrder, getFarmerOrderById } from '../../services/farmerService';
+import getEnvVars from '../../config';
 import axios from 'axios';
+
+const { apiUrl } = getEnvVars();
+
+const formatDate = (d) => {
+  if (!d) return '—';
+  try {
+    return new Date(d).toLocaleString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '—';
+  }
+};
 
 const OrderDetailsScreen = ({ route, navigation }) => {
   const { orderId } = route.params;
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
-  useEffect(() => {
-    fetchOrder();
-  }, []);
+  const farmerId = user?.id || user?._id;
 
-  const fetchOrder = async () => {
+  const load = async () => {
     try {
-      const res = await axios.get(`http://10.0.2.2:5000/api/farmer/orders/${orderId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setOrder(res.data);
-    } catch (err) {
-      console.error('Error:', err);
+      if (!token || !orderId) return;
+      const data = await getFarmerOrderById(orderId, token);
+      setOrder(data);
+    } catch (e) {
+      console.error(e);
+      setOrder(null);
     } finally {
       setLoading(false);
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      load();
+    }, [orderId, token])
+  );
+
+  const myItems = order?.items?.filter((i) => String(i.farmerId) === String(farmerId)) || [];
+  const mySubtotal = myItems.reduce((s, i) => s + Number(i.price) * Number(i.quantity), 0);
+
+  const updateStatus = async (nextStatus) => {
+    if (!token || !order?._id) return;
+    setUpdating(true);
+    try {
+      await axios.put(
+        `${apiUrl}/orders/${order._id}`,
+        { status: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await load();
+      Alert.alert('Updated', `Order status set to ${nextStatus}.`);
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Could not update order.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const confirmPress = () => {
+    Alert.alert(
+      'Confirm your produce',
+      'We will check stock again and reserve quantity for your items on this order.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setUpdating(true);
+            try {
+              await confirmFarmerOrder(orderId, token);
+              await load();
+              Alert.alert('Done', 'Your items are confirmed and stock has been reserved.');
+            } catch (err) {
+              Alert.alert('Cannot confirm', err.message || 'Stock may have changed. Try again.');
+            } finally {
+              setUpdating(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const shipPress = () => {
+    Alert.alert('Mark shipped', 'Mark this order as shipped to the customer?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Shipped', onPress: () => updateStatus('Shipped') }
+    ]);
+  };
+
+  const deliveredPress = () => {
+    Alert.alert('Mark delivered', 'Confirm delivery to the customer?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delivered', onPress: () => updateStatus('Delivered') }
+    ]);
+  };
+
   if (loading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color="#4CAF50" /></View>;
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#15803d" />
+      </View>
+    );
   }
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Order Details</Text>
-      <View style={styles.section}>
-        <Text style={styles.label}>Status: {order?.status}</Text>
-        <Text style={styles.label}>Total: LKR {order?.totalAmount}</Text>
+  if (!order) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.missing}>Order not found or you do not have access.</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>Go back</Text>
+        </TouchableOpacity>
       </View>
+    );
+  }
+
+  const trackingSteps = [
+    { key: 'Pending', label: 'Order placed' },
+    { key: 'Processing', label: 'Confirmed / preparing' },
+    { key: 'Shipped', label: 'Shipped' },
+    { key: 'Delivered', label: 'Delivered' }
+  ];
+  const statusOrder = ['Pending', 'Processing', 'Shipped', 'Delivered'];
+  const currentIdx = statusOrder.indexOf(order.status);
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Order details</Text>
+      <Text style={styles.orderId}>Ref: …{String(order._id).slice(-8).toUpperCase()}</Text>
+
       <View style={styles.section}>
-        <Text style={styles.subtitle}>Items:</Text>
-        {order?.items?.map((item, idx) => (
-          <Text key={idx} style={styles.item}>{item.name} - {item.quantity}kg x LKR{item.price}</Text>
-        ))}
+        <Text style={styles.sectionTitle}>Status</Text>
+        <Text style={styles.statusBig}>{order.status}</Text>
+        <Text style={styles.meta}>Placed: {formatDate(order.createdAt)}</Text>
+        {order.updatedAt && order.updatedAt !== order.createdAt && (
+          <Text style={styles.meta}>Last update: {formatDate(order.updatedAt)}</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Tracking</Text>
+        {order.status === 'Cancelled' ? (
+          <Text style={styles.cancelledText}>This order was cancelled.</Text>
+        ) : (
+          trackingSteps.map((step) => {
+            const stepIdx = statusOrder.indexOf(step.key);
+            const done = currentIdx >= stepIdx && stepIdx >= 0;
+            const current = order.status === step.key;
+            return (
+              <View key={step.key} style={styles.trackRow}>
+                <View style={[styles.trackDot, done && styles.trackDotDone, current && styles.trackDotCurrent]} />
+                <Text style={[styles.trackLabel, done && styles.trackLabelDone]}>{step.label}</Text>
+              </View>
+            );
+          })
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Customer</Text>
+        <Text style={styles.customer}>{order.customerName}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Your items in this order</Text>
+        {myItems.length === 0 ? (
+          <Text style={styles.muted}>No line items linked to your farm on this order.</Text>
+        ) : (
+          myItems.map((line, idx) => (
+            <View key={`${line.stockId}-${idx}`} style={styles.lineRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.product}>{line.product}</Text>
+                <Text style={styles.lineMeta}>
+                  {line.quantity} kg × LKR {Number(line.price).toFixed(2)}
+                  {line.farmerConfirmed ? ' · Confirmed' : ' · Awaiting your confirm'}
+                </Text>
+              </View>
+              <Text style={styles.lineTotal}>
+                LKR {(Number(line.price) * Number(line.quantity)).toFixed(2)}
+              </Text>
+            </View>
+          ))
+        )}
+        <View style={styles.subtotalRow}>
+          <Text style={styles.subtotalLabel}>Your subtotal</Text>
+          <Text style={styles.subtotalValue}>LKR {mySubtotal.toFixed(2)}</Text>
+        </View>
+        <Text style={styles.orderGrand}>Full order total: LKR {Number(order.totalAmount || 0).toFixed(2)}</Text>
+      </View>
+
+      <View style={styles.actions}>
+        {order.status === 'Pending' && myItems.some((l) => !l.farmerConfirmed) && (
+          <TouchableOpacity
+            style={[styles.primaryBtn, updating && styles.btnDisabled]}
+            onPress={confirmPress}
+            disabled={updating}
+          >
+            <Text style={styles.primaryBtnText}>Confirm my stock</Text>
+          </TouchableOpacity>
+        )}
+        {order.status === 'Processing' && (
+          <TouchableOpacity
+            style={[styles.primaryBtn, updating && styles.btnDisabled]}
+            onPress={shipPress}
+            disabled={updating}
+          >
+            <Text style={styles.primaryBtnText}>Mark as shipped</Text>
+          </TouchableOpacity>
+        )}
+        {order.status === 'Shipped' && (
+          <TouchableOpacity
+            style={[styles.primaryBtn, updating && styles.btnDisabled]}
+            onPress={deliveredPress}
+            disabled={updating}
+          >
+            <Text style={styles.primaryBtnText}>Mark as delivered</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA', padding: 16 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 20 },
-  section: { backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginBottom: 16 },
-  label: { fontSize: 16, color: '#555', marginBottom: 8 },
-  subtitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
-  item: { fontSize: 14, color: '#666', marginBottom: 4 }
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  content: { padding: 18, paddingBottom: 40 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#f0fdf4' },
+  missing: { textAlign: 'center', color: '#64748b', fontWeight: '600' },
+  backBtn: { marginTop: 16, backgroundColor: '#15803d', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  backBtnText: { color: '#fff', fontWeight: '800' },
+  title: { fontSize: 26, fontWeight: '900', color: '#14532d' },
+  orderId: { marginTop: 6, color: '#64748b', fontWeight: '700' },
+  section: {
+    marginTop: 20,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  sectionTitle: { fontSize: 12, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: 8 },
+  statusBig: { fontSize: 22, fontWeight: '900', color: '#15803d' },
+  meta: { marginTop: 6, color: '#475569', fontWeight: '600' },
+  trackRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  trackDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#e2e8f0',
+    marginRight: 12
+  },
+  trackDotDone: { backgroundColor: '#86efac' },
+  trackDotCurrent: { backgroundColor: '#15803d', borderWidth: 2, borderColor: '#bbf7d0' },
+  trackLabel: { color: '#94a3b8', fontWeight: '600' },
+  trackLabelDone: { color: '#1e293b', fontWeight: '700' },
+  customer: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  lineRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9'
+  },
+  product: { fontSize: 16, fontWeight: '800', color: '#1f2937' },
+  lineMeta: { marginTop: 4, color: '#64748b', fontWeight: '600', fontSize: 13 },
+  lineTotal: { fontWeight: '900', color: '#15803d' },
+  subtotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 2,
+    borderTopColor: '#dcfce7'
+  },
+  subtotalLabel: { fontWeight: '800', color: '#374151' },
+  subtotalValue: { fontWeight: '900', fontSize: 18, color: '#15803d' },
+  orderGrand: { marginTop: 10, fontSize: 13, color: '#64748b', fontWeight: '600' },
+  muted: { color: '#94a3b8', fontStyle: 'italic' },
+  cancelledText: { color: '#b91c1c', fontWeight: '800', fontSize: 16 },
+  actions: { marginTop: 20, gap: 12 },
+  primaryBtn: {
+    backgroundColor: '#15803d',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  btnDisabled: { opacity: 0.6 },
+  primaryBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 }
 });
 
 export default OrderDetailsScreen;

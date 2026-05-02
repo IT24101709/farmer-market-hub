@@ -2,25 +2,17 @@ const express = require('express');
 const router = express.Router();
 const {
   createOrder,
-  getAllOrders,
-  getSingleOrder,
+  getMyOrders,
+  getOrderById,
   updateOrder,
   deleteOrder
 } = require('../controllers/orderController');
+const { protect, customerRole, adminRole } = require('../middleware/authMiddleware');
 
-// POST /api/orders - Create a new order
-router.post('/', createOrder);
-
-// GET /api/orders - Get all orders
-router.get('/', getAllOrders);
-
-// GET /api/orders/:id - Get single order
-router.get('/:id', getSingleOrder);
-
-// PUT /api/orders/:id - Update order
-router.put('/:id', updateOrder);
-
-// DELETE /api/orders/:id - Delete order
-router.delete('/:id', deleteOrder);
+router.post('/', protect, customerRole, createOrder);
+router.get('/my', protect, customerRole, getMyOrders);
+router.get('/:id', protect, getOrderById);
+router.put('/:id', protect, updateOrder);
+router.delete('/:id', protect, adminRole, deleteOrder);
 
 module.exports = router;

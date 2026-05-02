@@ -1,53 +1,90 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  Image, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Image,
+  TouchableOpacity,
   TextInput,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView
+  SafeAreaView,
+  ScrollView
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { CartContext } from '../../context/CartContext';
+import { NotificationContext } from '../../context/NotificationContext';
 import { getMarketProducts } from '../../services/marketService';
 import getEnvVars from '../../config';
 
 const { apiUrl } = getEnvVars();
+const API_BASE = apiUrl.replace('/api', '');
+
+const CATEGORY_CHIPS = [
+  { label: 'All', value: '' },
+  { label: 'Leafy greens', value: 'leafy-greens' },
+  { label: 'Root veg', value: 'root-vegetables' },
+  { label: 'Fruiting', value: 'fruiting' },
+  { label: 'Gourds', value: 'gourds' },
+  { label: 'Beans & pods', value: 'beans-pods' },
+  { label: 'Bulbs & stems', value: 'bulbs-stems' },
+  { label: 'Herbs & spices', value: 'herbs-spices' },
+  { label: 'Other', value: 'other' }
+];
+
+const imageUrlForProduct = (item) => {
+  const path = item.imageUrl || item.image;
+  if (!path) return null;
+  return String(path).startsWith('http') ? path : `${API_BASE}${path}`;
+};
 
 const MarketplaceScreen = ({ navigation }) => {
-  const { user, logout } = useContext(AuthContext);
+  const { token, logout } = useContext(AuthContext);
   const { addToCart, cartItems } = useContext(CartContext);
+  const { unreadCount } = useContext(NotificationContext);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
 
   const fetchProducts = async (pageNum = 1, isRefresh = false) => {
     try {
+      if (!token) {
+        setProducts([]);
+        setHasMore(false);
+        return;
+      }
       if (pageNum === 1) setLoading(true);
-      
-      const data = await getMarketProducts({
+
+      const params = {
         page: pageNum,
         limit: 10,
-        search: searchQuery
-      });
+        search: searchQuery.trim() || undefined,
+        category: categoryFilter || undefined,
+        minPrice: minPrice.trim() ? Number(minPrice) : undefined,
+        maxPrice: maxPrice.trim() ? Number(maxPrice) : undefined
+      };
+
+      const data = await getMarketProducts(params, token);
 
       if (isRefresh || pageNum === 1) {
-        setProducts(data.products);
+        setProducts(data.products || []);
       } else {
-        setProducts(prev => [...prev, ...data.products]);
+        setProducts((prev) => [...prev, ...(data.products || [])]);
       }
 
-      setHasMore(pageNum < data.pagination.totalPages);
+      const totalPages = data.pagination?.totalPages ?? 1;
+      setHasMore(pageNum < totalPages);
       setPage(pageNum);
     } catch (error) {
       console.error('Error fetching market products:', error);
+      if (error.status === 401) logout();
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -56,7 +93,7 @@ const MarketplaceScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchProducts(1, true);
-  }, [searchQuery]);
+  }, [searchQuery, categoryFilter, minPrice, maxPrice, token]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -79,28 +116,25 @@ const MarketplaceScreen = ({ navigation }) => {
   };
 
   const renderProduct = ({ item }) => {
-    // Generate readable short IDs
     const stockShortId = item._id ? item._id.substring(item._id.length - 6).toUpperCase() : 'N/A';
-    const farmerShortId = item.farmerId?._id 
-      ? item.farmerId._id.substring(item.farmerId._id.length - 6).toUpperCase() 
+    const farmerShortId = item.farmerId?._id
+      ? item.farmerId._id.substring(item.farmerId._id.length - 6).toUpperCase()
       : 'N/A';
     const farmerName = item.farmerId?.name || 'Unknown Farmer';
-
-    const imageUrl = item.image.startsWith('http') 
-        ? item.image 
-        : `${apiUrl.replace('/api', '')}${item.image}`;
+    const title = item.name || item.vegetableName || 'Produce';
+    const imageUri = imageUrlForProduct(item);
 
     return (
       <View style={styles.card}>
-        <Image 
-          source={{ uri: imageUrl }} 
-          style={styles.cardImage} 
-          resizeMode="cover"
-        />
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cardImage, styles.imagePlaceholder]} />
+        )}
         <View style={styles.cardContent}>
           <View style={styles.titleRow}>
-            <Text style={styles.cardTitle}>{item.vegetableName}</Text>
-            <Text style={styles.priceTag}>LKR {item.pricePerKg}/kg</Text>
+            <Text style={styles.cardTitle}>{title}</Text>
+            <Text style={styles.priceTag}>LKR {Number(item.pricePerKg || 0).toFixed(2)}/kg</Text>
           </View>
           
           <View style={styles.infoRow}>
@@ -118,7 +152,9 @@ const MarketplaceScreen = ({ navigation }) => {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Available:</Text>
-            <Text style={styles.quantityValue}>{item.quantity} kg</Text>
+            <Text style={styles.quantityValue}>
+              {item.quantity} {item.unit || 'kg'}
+            </Text>
           </View>
 
           <TouchableOpacity style={styles.buyButton} onPress={() => addToCart(item)}>
@@ -137,6 +173,17 @@ const MarketplaceScreen = ({ navigation }) => {
           <Text style={styles.headerSubtitle}>Discover local produce</Text>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.ordersBtn} onPress={() => navigation.navigate('CustomerOrders')}>
+            <Text style={styles.ordersBtnText}>Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
+            <Text style={styles.notifBtnText}>Alerts</Text>
+            {unreadCount > 0 ? (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
           <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')}>
             <Text style={styles.cartText}>Cart ({cartItems.length})</Text>
           </TouchableOpacity>
@@ -154,15 +201,52 @@ const MarketplaceScreen = ({ navigation }) => {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+          {CATEGORY_CHIPS.map((chip) => {
+            const active = categoryFilter === chip.value;
+            return (
+              <TouchableOpacity
+                key={chip.label}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => setCategoryFilter(chip.value)}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{chip.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <View style={styles.priceFilterRow}>
+          <TextInput
+            style={styles.priceInput}
+            placeholder="Min LKR"
+            placeholderTextColor="#999"
+            keyboardType="decimal-pad"
+            value={minPrice}
+            onChangeText={setMinPrice}
+          />
+          <Text style={styles.priceDash}>–</Text>
+          <TextInput
+            style={styles.priceInput}
+            placeholder="Max LKR"
+            placeholderTextColor="#999"
+            keyboardType="decimal-pad"
+            value={maxPrice}
+            onChangeText={setMaxPrice}
+          />
+        </View>
       </View>
 
-      {loading && page === 1 ? (
+      {!token ? (
+        <View style={styles.centered}>
+          <Text style={styles.emptyText}>Sign in as a customer to browse the marketplace.</Text>
+        </View>
+      ) : loading && page === 1 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#4CAF50" />
         </View>
       ) : products.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>No products found in the market.</Text>
+          <Text style={styles.emptyText}>No products match your filters. Try clearing search or category.</Text>
         </View>
       ) : (
         <FlatList
@@ -209,6 +293,53 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    maxWidth: '62%'
+  },
+  ordersBtn: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 6,
+    marginBottom: 4
+  },
+  ordersBtnText: {
+    color: '#2E7D32',
+    fontWeight: 'bold',
+    fontSize: 12
+  },
+  notifBtn: {
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 6,
+    marginBottom: 4,
+    position: 'relative'
+  },
+  notifBtnText: {
+    color: '#E65100',
+    fontWeight: 'bold',
+    fontSize: 12
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#D32F2F',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4
+  },
+  notifBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '900'
   },
   cartBtn: {
     backgroundColor: '#E3F2FD',
@@ -245,7 +376,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     borderWidth: 1,
+    borderColor: '#E0E0E0'
+  },
+  chipScroll: {
+    marginTop: 12
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#ECEFF1',
+    marginRight: 8
+  },
+  chipActive: {
+    backgroundColor: '#C8E6C9'
+  },
+  chipText: {
+    color: '#424242',
+    fontWeight: '600',
+    fontSize: 13
+  },
+  chipTextActive: {
+    color: '#1B5E20'
+  },
+  priceFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8
+  },
+  priceInput: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
     borderColor: '#E0E0E0',
+    fontSize: 14,
+    color: '#333'
+  },
+  priceDash: {
+    color: '#757575',
+    fontWeight: '700'
+  },
+  imagePlaceholder: {
+    backgroundColor: '#E0E0E0',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   listContainer: {
     padding: 15,

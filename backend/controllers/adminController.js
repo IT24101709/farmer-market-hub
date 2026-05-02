@@ -72,17 +72,17 @@ exports.adminRemoveStock = async (req, res) => {
     stock.visibility = false;
     await stock.save();
 
-    await AuditLog.create({
+await AuditLog.create({
       adminId: req.user.id,
       stockId: stock._id,
       action: 'ADMIN_STOCK_REMOVE',
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-      details: { reason, vegetableName: stock.vegetableName, farmer: stock.farmerId.name }
+      details: { reason, name: stock.name, farmer: stock.farmerId.name }
     });
 
     res.status(200).json({ 
-      message: `✅ ${stock.vegetableName} listing removed. Reason: ${reason}. Farmer notified.` 
+      message: `✅ ${stock.name} listing removed. Reason: ${reason}. Farmer notified.` 
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

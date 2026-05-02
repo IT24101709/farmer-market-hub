@@ -28,11 +28,13 @@ const {
 } = require('../controllers/adminController');
 const { getPendingFarmers } = require('../controllers/authController');
 const { protect, adminRole } = require('../middleware/authMiddleware');
+const { getAllOrdersAdmin } = require('../controllers/orderController');
 
 // All routes here are protected and require admin role
 router.use(protect);
 router.use(adminRole);
 
+router.get('/orders', getAllOrdersAdmin);
 router.get('/summary', getSystemSummary);
 router.get('/farmers', getAllFarmers); // keeping backward compatibility
 router.get('/farmers/export', exportFarmers); // Make sure this comes BEFORE /farmers/:id

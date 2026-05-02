@@ -11,8 +11,17 @@ import {
   Dimensions
 } from 'react-native';
 import { getPublicProducts } from '../../services/publicService';
+import getEnvVars from '../../config';
 
 const { width } = Dimensions.get('window');
+const { apiUrl } = getEnvVars();
+const API_BASE = apiUrl.replace('/api', '');
+
+const previewImageUrl = (product) => {
+  const path = product.imageUrl || product.image;
+  if (!path) return null;
+  return String(path).startsWith('http') ? path : `${API_BASE}${path}`;
+};
 
 const LandingScreen = ({ navigation }) => {
   const [products, setProducts] = useState([]);
@@ -44,16 +53,19 @@ const LandingScreen = ({ navigation }) => {
 
     return (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productScroll}>
-        {products.map(product => {
-          const imageUrl = product.image.startsWith('http') 
-            ? product.image 
-            : `http://localhost:5000${product.image}`;
+        {products.map((product) => {
+          const imageUrl = previewImageUrl(product);
+          const title = product.name || product.vegetableName || 'Fresh produce';
 
           return (
             <View key={product._id} style={styles.productCard}>
-              <Image source={{ uri: imageUrl }} style={styles.productImage} />
+              {imageUrl ? (
+                <Image source={{ uri: imageUrl }} style={styles.productImage} />
+              ) : (
+                <View style={[styles.productImage, { backgroundColor: '#E0E0E0' }]} />
+              )}
               <View style={styles.productInfo}>
-                <Text style={styles.productName}>{product.vegetableName}</Text>
+                <Text style={styles.productName}>{title}</Text>
                 <Text style={styles.productPrice}>LKR {product.pricePerKg}/kg</Text>
                 <Text style={styles.farmerName}>By {product.farmerId?.name || 'Local Farmer'}</Text>
               </View>

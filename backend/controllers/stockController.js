@@ -1,8 +1,71 @@
+const mongoose = require('mongoose');
 const Stock = require('../models/Stock');
+const { CATEGORY_ENUM } = require('../utils/stockCategory');
 const StockHistory = require('../models/StockHistory');
 const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
+const { expiryFromHarvest, attachSpoilageMeta } = require('../utils/shelfLife');
+
+const syncAvailabilityFields = (stock) => {
+  const quantity = Number(stock.quantity || 0);
+
+  if (quantity === 0) {
+    stock.status = 'Out of Stock';
+    stock.availabilityStatus = false;
+    stock.visibility = false;
+    return;
+  }
+
+  const isAvailable = stock.status === 'Available';
+  stock.availabilityStatus = isAvailable;
+  stock.visibility = isAvailable;
+};
+
+// Design decision for zero quantity:
+// Stock records are retained for audit/reporting, but are marked unavailable and hidden from public listings.
+// Manual DELETE remains available for farmers who want to remove their own stock entry.
+
+// @desc    Get all available stocks with filters
+// @route   GET /api/stocks
+// @access  Private
+exports.getAvailableStocks = async (req, res) => {
+  try {
+    const { category, minPrice, maxPrice, search, farmerId } = req.query;
+
+    const filter = {
+      availabilityStatus: true,
+      isDeleted: false
+    };
+
+    if (category) {
+      const c = String(category).toLowerCase().trim();
+      if (CATEGORY_ENUM.includes(c)) {
+        filter.category = c;
+      } else if (mongoose.Types.ObjectId.isValid(category)) {
+        filter.categoryId = category;
+      }
+    }
+    if (farmerId) filter.farmerId = farmerId;
+    if (search) filter.name = { $regex: search, $options: 'i' };
+
+    if (minPrice || maxPrice) {
+      filter.pricePerKg = {};
+      if (minPrice) filter.pricePerKg.$gte = Number(minPrice);
+      if (maxPrice) filter.pricePerKg.$lte = Number(maxPrice);
+    }
+
+    const stocks = await Stock.find(filter)
+      .populate('farmerId', 'name email profileDetails')
+      .populate('categoryId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json(stocks);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
 
 // @desc    Create new stock
 // @route   POST /api/stocks
@@ -10,27 +73,40 @@ const path = require('path');
 exports.createStock = async (req, res) => {
   try {
     // Validation middleware already ran, use req.validatedData
-    const { vegetableName, harvestDate, quantity, pricePerKg, expiryDate, categoryId } = req.validatedData || req.body;
+    const { name, category, unit, harvestDate, quantity, pricePerKg, expiryDate, categoryId, qualityGrade, status, description } = req.validatedData || req.body;
     const { minPriceLimit, maxPriceLimit } = req.stockLimits || {};
 
     if (!req.file) {
       return res.status(400).json({ message: '❌ Image is required' });
     }
 
-    const imagePath = `/uploads/${req.file.filename}`;
+    const imageUrl = `/uploads/${req.file.filename}`;
+    const resolvedExpiry = expiryDate
+      ? new Date(expiryDate)
+      : expiryFromHarvest(harvestDate, category, name);
 
     const newStock = new Stock({
       farmerId: req.user.id,
+      // New fields
+      name,
+      category,
+      unit: unit || 'kg',
+      description: description || '',
+      // Legacy/backward compatibility
       categoryId: categoryId || undefined,
-      vegetableName,
       harvestDate,
       quantity,
       pricePerKg,
+      qualityGrade: qualityGrade || 'A',
       minPriceLimit: minPriceLimit || 0,
       maxPriceLimit: maxPriceLimit || Infinity,
-      expiryDate: new Date(expiryDate),
-      image: imagePath,
-status: 'Available'  // Auto-listed for demo
+      expiryDate: resolvedExpiry,
+      imageUrl,
+      status: status || 'Available',
+      approvalStatus: 'Approved',
+      // Auto-calculate based on quantity (pre-save hook will also handle this)
+      availabilityStatus: status === 'Available' && Number(quantity) > 0,
+      visibility: status === 'Available' && Number(quantity) > 0
     });
 
     const savedStock = await newStock.save();
@@ -43,15 +119,21 @@ status: 'Available'  // Auto-listed for demo
       action: 'STOCK_CREATED',
       ip: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent'),
-      details: { vegetableName, quantity, pricePerKg: `₹${pricePerKg}` }
+      details: { name, category, quantity, pricePerKg: `₹${pricePerKg}` }
     });
 
-    res.status(201).json({ 
-      message: `✅ Stock for ${vegetableName} created successfully. Awaiting admin approval.`,
-      stock: savedStock 
+    res.status(201).json({
+      message: `✅ Stock for ${name} created successfully. It is listed on the marketplace for customers.`,
+      stock: attachSpoilageMeta(savedStock.toObject(), new Date())
     });
   } catch (error) {
     console.error('Create stock error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message:
+          'You already have stock with this vegetable name and harvest date. Change the name or harvest date, or edit the existing item.'
+      });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -82,8 +164,11 @@ exports.getMyStocks = async (req, res) => {
       Stock.countDocuments(query)
     ]);
 
+    const now = new Date();
+    const stocksWithMeta = stocks.map((s) => attachSpoilageMeta(s, now));
+
     res.status(200).json({
-      stocks,
+      stocks: stocksWithMeta,
       pagination: {
         total,
         page: Number(page),
@@ -109,10 +194,11 @@ exports.getStockById = async (req, res) => {
 
     // Check if it belongs to farmer
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can access this stock record.' });
     }
 
-    res.status(200).json(stock);
+    const payload = attachSpoilageMeta(stock.toObject ? stock.toObject() : stock, new Date());
+    res.status(200).json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -134,27 +220,31 @@ exports.updateStock = async (req, res) => {
     }
 
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: '❌ Not authorized' });
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update this stock record.' });
     }
 
     if (stock.isDeleted) {
       return res.status(400).json({ message: '❌ Cannot update deleted stock. Use admin restore.' });
     }
 
-    // Apply validated updates
+// Apply validated updates
     if (validatedData) {
-      if (validatedData.vegetableName !== undefined) stock.vegetableName = validatedData.vegetableName;
+      if (validatedData.name !== undefined) stock.name = validatedData.name;
+      if (validatedData.category !== undefined) stock.category = validatedData.category;
+      if (validatedData.unit !== undefined) stock.unit = validatedData.unit;
+      if (validatedData.description !== undefined) stock.description = validatedData.description;
       if (validatedData.harvestDate !== undefined) stock.harvestDate = validatedData.harvestDate;
       if (validatedData.quantity !== undefined) {
-        stock.quantity = validatedData.quantity;
         changedFields.oldQuantity = stock.quantity;
+        stock.quantity = validatedData.quantity;
         changedFields.newQuantity = validatedData.quantity;
       }
       if (validatedData.pricePerKg !== undefined) {
-        stock.pricePerKg = validatedData.pricePerKg;
         changedFields.oldPrice = stock.pricePerKg;
-        changedFields.newPrice = validatedData.pricePerKg;
+        stock.pricePerKg = Number(validatedData.pricePerKg.toFixed(2));
+        changedFields.newPrice = stock.pricePerKg;
       }
+      if (validatedData.qualityGrade !== undefined) stock.qualityGrade = validatedData.qualityGrade;
       if (req.stockLimits) {
         stock.minPriceLimit = req.stockLimits.minPriceLimit;
         stock.maxPriceLimit = req.stockLimits.maxPriceLimit;
@@ -162,7 +252,7 @@ exports.updateStock = async (req, res) => {
     }
 
     // Other fields
-    const { expiryDate, status, visibility } = req.body;
+    const { expiryDate, status } = req.body;
     if (expiryDate !== undefined) {
       stock.expiryDate = new Date(expiryDate);
     }
@@ -176,26 +266,21 @@ exports.updateStock = async (req, res) => {
       stock.status = 'Expired';
       stock.visibility = false;
     }
-    if (stock.quantity === 0) {
-      stock.status = 'Out of Stock';
-      stock.visibility = false;
-    } else if (stock.quantity < 10) {
-      stock.status = 'Low Stock';
-    }
+syncAvailabilityFields(stock);
 
-    let newImage = stock.image;
+    let newImageUrl = stock.imageUrl;
     if (req.file) {
-      newImage = `/uploads/${req.file.filename}`;
-      if (stock.image && stock.image !== newImage) {
+      newImageUrl = `/uploads/${req.file.filename}`;
+      if (stock.imageUrl && stock.imageUrl !== newImageUrl) {
         const fs = require('fs');
         const path = require('path');
-        const filePath = path.join(__dirname, '..', stock.image);
+        const filePath = path.join(__dirname, '..', stock.imageUrl);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
       }
     }
-    stock.image = newImage;
+    stock.imageUrl = newImageUrl;
 
     const oldStatus = stock.status;
     const updatedStock = await stock.save();
@@ -213,7 +298,7 @@ exports.updateStock = async (req, res) => {
     });
 
     res.status(200).json({ 
-      message: `✅ Stock for ${updatedStock.vegetableName} updated from ${changedFields.oldQuantity || '?'} kg to ${updatedStock.quantity} kg.`,
+      message: `✅ Stock for ${updatedStock.name} updated from ${changedFields.oldQuantity || '?'} kg to ${updatedStock.quantity} kg.`,
       stock: updatedStock 
     });
   } catch (error) {
@@ -234,18 +319,18 @@ exports.deleteStock = async (req, res) => {
     }
 
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: '❌ Not authorized' });
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can delete this stock record.' });
     }
 
     if (stock.isDeleted) {
       return res.status(400).json({ message: '❌ Already deleted' });
     }
 
-    // Image cleanup
-    if (stock.image) {
+// Image cleanup
+    if (stock.imageUrl) {
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, '..', stock.image);
+      const filePath = path.join(__dirname, '..', stock.imageUrl);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
@@ -261,10 +346,10 @@ exports.deleteStock = async (req, res) => {
       action: 'STOCK_DELETED_FARMER',
       ip: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent'),
-      details: { vegetableName: stock.vegetableName, reason: 'Farmer manual removal' }
+      details: { name: stock.name, reason: 'Farmer manual removal' }
     });
 
-    res.status(200).json({ message: `✅ Stock for ${stock.vegetableName} removed successfully.` });
+    res.status(200).json({ message: `✅ Stock for ${stock.name} removed successfully.` });
   } catch (error) {
     console.error('Delete stock error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -283,13 +368,12 @@ exports.toggleVisibility = async (req, res) => {
     }
 
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update visibility.' });
     }
 
-    // Cannot make visible if not approved yet
-    if (!stock.visibility && stock.approvalStatus !== 'Approved') {
+    if (!stock.visibility && stock.approvalStatus === 'Rejected') {
       return res.status(400).json({
-        message: 'Stock must be approved by admin before it can be listed on the marketplace'
+        message: 'Rejected listings cannot be shown on the marketplace.'
       });
     }
 
@@ -327,13 +411,101 @@ exports.updateStatus = async (req, res) => {
     }
 
     if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update status.' });
     }
 
     stock.status = status;
+    syncAvailabilityFields(stock);
     await stock.save();
 
     res.status(200).json({ message: `Status updated to ${status}`, stock });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Update stock quantity
+// @route   PATCH /api/stocks/:id/quantity
+// @access  Private (owning farmer only)
+exports.updateQuantity = async (req, res) => {
+  try {
+    const quantity = Number(req.body.quantity);
+
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      return res.status(400).json({ message: 'Quantity must be a positive number or zero.' });
+    }
+
+    const stock = await Stock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+
+    if (stock.farmerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update quantity.' });
+    }
+
+    stock.quantity = quantity;
+    syncAvailabilityFields(stock);
+
+    const updatedStock = await stock.save();
+    res.status(200).json({
+      message: quantity === 0
+        ? 'Quantity updated to zero. Stock retained and marked unavailable.'
+        : 'Quantity updated successfully.',
+      stock: updatedStock
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Update stock price independently
+// @route   PATCH /api/stocks/:id/price
+// @access  Private (owning farmer only)
+exports.updatePrice = async (req, res) => {
+  try {
+    const price = Number(req.body.pricePerKg);
+
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ message: 'Price must be greater than 0.' });
+    }
+
+    const stock = await Stock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+
+    if (stock.farmerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update price.' });
+    }
+
+    stock.pricePerKg = Number(price.toFixed(2));
+    const updatedStock = await stock.save();
+    res.status(200).json(updatedStock);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Update stock availability status
+// @route   PATCH /api/stocks/:id/availability
+// @access  Private (owning farmer only)
+exports.updateAvailability = async (req, res) => {
+  try {
+    const { availabilityStatus } = req.body;
+
+    if (typeof availabilityStatus !== 'boolean') {
+      return res.status(400).json({ message: 'availabilityStatus must be true or false.' });
+    }
+
+    const stock = await Stock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+
+    if (stock.farmerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update availability.' });
+    }
+
+    stock.status = availabilityStatus && stock.quantity > 0 ? 'Available' : 'Out of Stock';
+    syncAvailabilityFields(stock);
+
+    const updatedStock = await stock.save();
+    res.status(200).json(updatedStock);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -384,16 +556,33 @@ exports.bulkAddStocks = async (req, res) => {
       return res.status(403).json({ message: '❌ Your account is suspended. Contact admin.' });
     }
 
-    const stocksToInsert = stocks.map(stock => ({
-      farmerId,
-      categoryId: stock.categoryId || undefined,
-      vegetableName: stock.vegetableName,
-      quantity: stock.quantity,
-      pricePerKg: stock.pricePerKg,
-      expiryDate: stock.expiryDate,
-      image: stock.image || '/uploads/default-veg.png', // Default image placeholder
-      status: 'Available'
-    }));
+const stocksToInsert = stocks.map((stock) => {
+      const harvest = stock.harvestDate ? new Date(stock.harvestDate) : new Date();
+      const category = stock.category || 'other';
+      const name = stock.name || 'Item';
+      const exp = stock.expiryDate
+        ? new Date(stock.expiryDate)
+        : expiryFromHarvest(harvest, category, name);
+
+      return {
+        farmerId,
+        name,
+        category,
+        unit: stock.unit || 'kg',
+        description: stock.description || '',
+        categoryId: stock.categoryId || undefined,
+        harvestDate: harvest,
+        quantity: stock.quantity,
+        pricePerKg: stock.pricePerKg,
+        expiryDate: exp,
+        imageUrl: stock.imageUrl || stock.image || '/uploads/default-veg.png',
+        qualityGrade: stock.qualityGrade || 'A',
+        status: 'Available',
+        approvalStatus: 'Approved',
+        visibility: true,
+        availabilityStatus: true
+      };
+    });
 
     const insertedStocks = await Stock.insertMany(stocksToInsert);
     res.status(201).json({ message: `Successfully added ${insertedStocks.length} items`, insertedStocks });
@@ -441,4 +630,3 @@ exports.bulkUpdateStocks = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-

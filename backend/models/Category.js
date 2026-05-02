@@ -7,6 +7,14 @@ const categorySchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  /** Must match Stock.category enum (e.g. leafy-greens, fruiting). Canonical rows are seeded with slug. */
+  slug: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    lowercase: true
+  },
   description: {
     type: String,
     trim: true

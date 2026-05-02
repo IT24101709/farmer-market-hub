@@ -2,10 +2,10 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-// Helper to generate Access JWT (Short-lived)
+// Helper to generate Access JWT — override with JWT_EXPIRES_IN (e.g. 15m, 24h, 7d)
 const generateAccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_key', {
-    expiresIn: '15m', // 15 minutes
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
   });
 };
 
@@ -81,8 +81,14 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: '❌ Password must contain 8+ chars, uppercase, number & symbol.' });
     }
 
+    // Phone validation: Required for Farmers, optional for Customers
     const phone = profileDetails?.phone || '';
-    if (!phone || !/^\d{10,15}$/.test(phone)) {
+    if (role === 'Farmer') {
+      if (!phone || !/^\d{10,15}$/.test(phone)) {
+        return res.status(400).json({ message: '❌ Enter a valid 10-digit mobile number.' });
+      }
+    } else if (phone && !/^\d{10,15}$/.test(phone)) {
+      // If phone is provided for Customer, validate it
       return res.status(400).json({ message: '❌ Enter a valid 10-digit mobile number.' });
     }
 
@@ -157,12 +163,21 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { identifier, password } = req.body;
+    const normalizedIdentifier = (identifier || '').trim();
+
+    if (!normalizedIdentifier || !password) {
+      return res.status(400).json({ message: 'Identifier and password are required' });
+    }
+
+    const identifierQueryValue = normalizedIdentifier.includes('@')
+      ? normalizedIdentifier.toLowerCase()
+      : normalizedIdentifier;
 
     // Check for user by email OR phone
     const user = await User.findOne({ 
       $or: [
-        { email: identifier },
-        { 'profileDetails.phone': identifier }
+        { email: identifierQueryValue },
+        { 'profileDetails.phone': identifierQueryValue }
       ]
     });
 

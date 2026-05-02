@@ -1,577 +1,549 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
   ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
   TextInput,
-  ScrollView
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getMyStocks } from '../services/stockService';
 import { AuthContext } from '../context/AuthContext';
+import getEnvVars from '../config';
+import {
+  deleteStock,
+  getMyStocks,
+  toggleStockVisibility,
+  updateStockAvailability
+} from '../services/stockService';
+
+const { apiUrl } = getEnvVars();
+const API_BASE = apiUrl.replace('/api', '');
+
+const imageUrlFor = (image) => {
+  if (!image) return null;
+  return image.startsWith('http') ? image : `${API_BASE}${image}`;
+};
+
+const isAvailable = (stock) => stock.availabilityStatus === true || stock.status === 'Available';
+
+const riskColors = {
+  critical: { bg: '#fee2e2', fg: '#991b1b' },
+  high: { bg: '#ffedd5', fg: '#c2410c' },
+  medium: { bg: '#fef9c3', fg: '#a16207' },
+  low: { bg: '#ecfdf5', fg: '#166534' }
+};
 
 const StockListScreen = ({ navigation }) => {
-  const { token } = React.useContext(AuthContext);
-  
+  const { token, logout, user } = useContext(AuthContext);
+  const { width } = useWindowDimensions();
   const [stocks, setStocks] = useState([]);
-  const [filteredStocks, setFilteredStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('Available'); // All, Available, Expired, Qty>0 default
-  const [showZeroQty, setShowZeroQty] = useState(false);
-  const [priceFilter, setPriceFilter] = useState('All'); // All, Under 100, 100-500, Over 500
-  const [dateFilter, setDateFilter] = useState('All'); // All, Last 7 Days, Last 30 Days
 
-  const fetchStocks = async (pageNum = 1, isRefresh = false) => {
+  const gap = 12;
+  const pagePadding = 16;
+  const numCols = width >= 520 ? 2 : 1;
+  const cardWidth =
+    numCols === 1
+      ? width - pagePadding * 2
+      : (width - pagePadding * 2 - gap) / 2;
+
+  const fetchStocks = useCallback(async () => {
     try {
       if (!token) return;
-      
-      // Attempt to load from cache on initial load
-      if (pageNum === 1 && !isRefresh) {
-        const cached = await AsyncStorage.getItem('@my_stocks');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          setStocks(parsed);
-          applyFilters(parsed, searchQuery, filter, priceFilter, dateFilter);
-        }
-      }
-
-      const data = await getMyStocks(token, pageNum, 20); // Limit is 20
-      
-      // Backend returns { stocks: [...], pagination: {...} }
-      const newStocks = data.stocks || [];
-      const totalPages = data.pagination?.totalPages || 1;
-      
-      let updatedStocks;
-      if (pageNum === 1) {
-        updatedStocks = newStocks;
-        // Save to cache
-        await AsyncStorage.setItem('@my_stocks', JSON.stringify(newStocks));
-      } else {
-        updatedStocks = [...stocks, ...newStocks];
-      }
-      
-      setStocks(updatedStocks);
-      applyFilters(updatedStocks, searchQuery, filter, priceFilter, dateFilter);
-      
-      setHasMore(pageNum < totalPages);
-      setPage(pageNum);
-      
+      const data = await getMyStocks(token, 1, 100);
+      setStocks(data.stocks || []);
     } catch (error) {
       console.error('Error fetching stocks:', error);
-      // If network fails, we've already loaded the cache!
+      if (error.status === 401) logout();
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [token, logout]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchStocks(1);
-    });
-    fetchStocks(1);
+    const unsubscribe = navigation.addListener('focus', fetchStocks);
+    fetchStocks();
     return unsubscribe;
-  }, [navigation, token]);
+  }, [navigation, fetchStocks]);
 
-  const applyFilters = (data, query, currentFilter, currentPriceFilter, currentDateFilter) => {
-    let result = data;
-    
-    // Auto-hide zero quantity stocks
-    if (!showZeroQty) {
-      result = result.filter(item => item.quantity > 0);
-    }
-    
-    // Search by name
-    if (query) {
-      result = result.filter(item => 
-        item.vegetableName.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-    
-    // Filter by status
-    if (currentFilter !== 'All') {
-      result = result.filter(item => item.status === currentFilter);
-    }
-    // Already filtered by previous steps
-
-    // Filter by price
-    if (currentPriceFilter !== 'All') {
-      result = result.filter(item => {
-        if (currentPriceFilter === 'Under 100') return item.pricePerKg < 100;
-        if (currentPriceFilter === '100-500') return item.pricePerKg >= 100 && item.pricePerKg <= 500;
-        if (currentPriceFilter === 'Over 500') return item.pricePerKg > 500;
-        return true;
-      });
-    }
-
-    // Filter by date added
-    if (currentDateFilter !== 'All') {
-      const now = new Date();
-      result = result.filter(item => {
-        const itemDate = new Date(item.createdAt || item.updatedAt || now); // Fallback to now if no date
-        const diffTime = Math.abs(now - itemDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (currentDateFilter === 'Last 7 Days') return diffDays <= 7;
-        if (currentDateFilter === 'Last 30 Days') return diffDays <= 30;
-        return true;
-      });
-    }
-    
-    setFilteredStocks(result);
-  };
-
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    applyFilters(stocks, text, filter, priceFilter, dateFilter);
-  };
-
-  const handleFilterChange = (type, value) => {
-    let f = filter, pf = priceFilter, df = dateFilter;
-    if (type === 'status') { setFilter(value); f = value; }
-    if (type === 'price') { setPriceFilter(value); pf = value; }
-    if (type === 'date') { setDateFilter(value); df = value; }
-    applyFilters(stocks, searchQuery, f, pf, df);
-  };
-
-  const clearFilters = () => {
-    setFilter('All');
-    setPriceFilter('All');
-    setDateFilter('All');
-    setSearchQuery('');
-    setFilteredStocks(stocks);
-  };
+  const filteredStocks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return stocks;
+    return stocks.filter((stock) => {
+      const n = (stock.name || stock.vegetableName || '').toLowerCase();
+      return n.includes(query);
+    });
+  }, [stocks, searchQuery]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchStocks(1, true);
+    fetchStocks();
   };
 
-  const loadMore = () => {
-    if (hasMore && !loading && !refreshing) {
-      fetchStocks(page + 1);
-    }
-  };
+  const confirmDelete = useCallback(
+    (stock) => {
+      Alert.alert(
+        'Delete stock',
+        `Remove ${stock.vegetableName || stock.name} from your listings?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await deleteStock(stock._id, token);
+                setStocks((current) => current.filter((item) => item._id !== stock._id));
+              } catch (error) {
+                if (error.status === 401) logout();
+                Alert.alert('Error', error.message || 'Failed to delete stock.');
+              }
+            }
+          }
+        ]
+      );
+    },
+    [token, logout]
+  );
 
-  const renderFooter = () => {
-    if (!hasMore) return null;
-    return (
-      <View style={{ paddingVertical: 20 }}>
-        <ActivityIndicator size="small" color="#4CAF50" />
-      </View>
-    );
-  };
+  const handleToggleMarketplace = useCallback(
+    async (item) => {
+      try {
+        await toggleStockVisibility(item._id, token);
+        await fetchStocks();
+      } catch (error) {
+        if (error.status === 401) logout();
+        Alert.alert('Marketplace', error.message || 'Could not update listing visibility.');
+      }
+    },
+    [token, logout, fetchStocks]
+  );
 
-  const renderStockItem = ({ item }) => {
-    return (
-      <TouchableOpacity 
-        style={styles.tableRow}
-        onPress={() => navigation.navigate('StockDetail', { stockId: item._id })}
-      >
-        <View style={styles.cell}>
-          <Text style={styles.cellText}>{item.vegetableName}</Text>
-        </View>
-        <View style={styles.cell}>
-          <Text style={styles.cellText}>{item.quantity}kg</Text>
-        </View>
-        <View style={styles.cell}>
-          <Text style={styles.cellText}>₹{item.pricePerKg}</Text>
-        </View>
-        <View style={styles.cell}>
-          <TouchableOpacity style={styles.editBtn}>
-            <Text style={styles.editBtnText}>Edit</Text>
+  const handleToggleAvailability = useCallback(
+    async (item) => {
+      try {
+        const currentlyAvail = isAvailable(item);
+        await updateStockAvailability(item._id, !currentlyAvail, token);
+        await fetchStocks();
+      } catch (error) {
+        if (error.status === 401) logout();
+        Alert.alert('Availability', error.message || 'Could not update availability.');
+      }
+    },
+    [token, logout, fetchStocks]
+  );
+
+  const renderStockCard = useCallback(
+    ({ item }) => {
+      const available = isAvailable(item);
+      const imageUri = item.imageUrl
+        ? imageUrlFor(item.imageUrl)
+        : item.image
+          ? imageUrlFor(item.image)
+          : null;
+      const name = item.name || item.vegetableName;
+      const riskLevel = String(item.spoilageRiskLevel || 'low').toLowerCase();
+      const rc = riskColors[riskLevel] || riskColors.low;
+      const daysLeft =
+        item.daysLeft !== undefined && item.daysLeft !== null ? item.daysLeft : null;
+
+      return (
+        <View style={[styles.gridCard, { width: cardWidth }]}>
+          <TouchableOpacity
+            style={styles.imageSquareWrap}
+            onPress={() => navigation.navigate('StockDetail', { stockId: item._id })}
+            activeOpacity={0.85}
+          >
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.squareImage} />
+            ) : (
+              <View style={[styles.squareImage, styles.imagePlaceholder]}>
+                <Text style={styles.imagePlaceholderText}>No photo</Text>
+              </View>
+            )}
           </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
-  if (loading && !refreshing && page === 1) {
+          <View style={styles.cardDetails}>
+            <View style={styles.titleRow}>
+              <Text style={styles.stockName} numberOfLines={2}>
+                {name}
+              </Text>
+              <Text style={[styles.statusBadge, available ? styles.availableBadge : styles.unavailableBadge]}>
+                {available ? 'Available' : 'Unavailable'}
+              </Text>
+            </View>
+
+            <Text style={styles.categoryText} numberOfLines={1}>
+              {item.category || item.categoryId?.name || 'Vegetable'}
+            </Text>
+
+            <View style={[styles.riskPill, { backgroundColor: rc.bg }]}>
+              <Text style={[styles.riskPillText, { color: rc.fg }]}>
+                Spoilage: {riskLevel.toUpperCase()}
+                {daysLeft !== null ? ` · ${daysLeft}d to expiry` : ''}
+              </Text>
+            </View>
+
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaLabel}>Quantity</Text>
+              <Text style={styles.metaValue}>
+                {Number(item.quantity || 0)} {item.unit || 'kg'}
+              </Text>
+            </View>
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaLabel}>Price</Text>
+              <Text style={styles.priceValue}>LKR {Number(item.pricePerKg || 0).toFixed(2)} / kg</Text>
+            </View>
+
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => navigation.navigate('EditStock', { stock: item, stockId: item._id })}
+              >
+                <Text style={styles.editButtonText}>Update</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteButton} onPress={() => confirmDelete(item)}>
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.marketHint}>
+              Marketplace: {item.visibility !== false ? 'visible' : 'hidden'} · Approval:{' '}
+              {item.approvalStatus || '—'}
+            </Text>
+            <View style={styles.marketRow}>
+              <TouchableOpacity style={styles.marketBtn} onPress={() => handleToggleMarketplace(item)}>
+                <Text style={styles.marketBtnText}>
+                  {item.visibility !== false ? 'Hide from market' : 'Show on market'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.marketBtnSecondary} onPress={() => handleToggleAvailability(item)}>
+                <Text style={styles.marketBtnTextSecondary}>
+                  {available ? 'Mark unavailable' : 'Mark available'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('StockDetail', { stockId: item._id })}
+              style={styles.viewLink}
+            >
+              <Text style={styles.viewLinkText}>View details</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    },
+    [navigation, cardWidth, confirmDelete, handleToggleMarketplace, handleToggleAvailability]
+  );
+
+  if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2E7D32" />
-        <Text style={styles.loadingText}>Loading your harvest...</Text>
+        <ActivityIndicator size="large" color="#16a34a" />
+        <Text style={styles.loadingText}>Loading your stock...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Stock List</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity 
-            style={[styles.headerBtn, styles.addBtn]}
-            onPress={() => navigation.navigate('AddStock')}
-          >
-            <Text style={styles.headerBtnText}>[+ Add New Stock]</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerBtn}
-            onPress={() => navigation.navigate('StockList', { editMode: true })} // or multi-select mode
-          >
-            <Text style={styles.headerBtnText}>[Edit Stock]</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.title}>My vegetable stock</Text>
+        <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('AddStock')}>
+          <Text style={styles.addButtonText}>Add stock</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search vegetables..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-        />
-      </View>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search by vegetable name..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholderTextColor="#9ca3af"
+      />
 
-      <View style={styles.filterContainerWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Status:</Text>
-          <TouchableOpacity 
-            style={[styles.filterChip, filter === 'All' && styles.filterChipActive]}
-            onPress={() => handleFilterChange('status', 'All')}
-          >
-            <Text style={[styles.filterText, filter === 'All' && styles.filterTextActive]}>All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterChip, filter === 'Available' && styles.filterChipActive]}
-            onPress={() => handleFilterChange('status', 'Available')}
-          >
-            <Text style={[styles.filterText, filter === 'Available' && styles.filterTextActive]}>Available</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterChip, filter === 'Expired' && styles.filterChipActive]}
-            onPress={() => handleFilterChange('status', 'Expired')}
-          >
-            <Text style={[styles.filterText, filter === 'Expired' && styles.filterTextActive]}>Expired</Text>
-          </TouchableOpacity>
-
-          <View style={styles.filterDivider} />
-          
-          <Text style={styles.filterLabel}>Price:</Text>
-          {['All', 'Under 100', '100-500', 'Over 500'].map(pFilter => (
-            <TouchableOpacity 
-              key={pFilter}
-              style={[styles.filterChip, priceFilter === pFilter && styles.filterChipActive]}
-              onPress={() => handleFilterChange('price', pFilter)}
-            >
-              <Text style={[styles.filterText, priceFilter === pFilter && styles.filterTextActive]}>{pFilter}</Text>
-            </TouchableOpacity>
-          ))}
-
-          <View style={styles.filterDivider} />
-          
-          <Text style={styles.filterLabel}>Date:</Text>
-          {['All', 'Last 7 Days', 'Last 30 Days'].map(dFilter => (
-            <TouchableOpacity 
-              key={dFilter}
-              style={[styles.filterChip, dateFilter === dFilter && styles.filterChipActive]}
-              onPress={() => handleFilterChange('date', dFilter)}
-            >
-              <Text style={[styles.filterText, dateFilter === dFilter && styles.filterTextActive]}>{dFilter}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {filteredStocks.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No stocks found.</Text>
-          {(searchQuery || filter !== 'All') && (
-            <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
-              <Text style={styles.clearButtonText}>Clear Filters</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <FlatList
-          data={filteredStocks}
-          renderItem={renderStockItem}
-          keyExtractor={(item) => item._id}
-          numColumns={1}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-          contentContainerStyle={styles.tableContainer}
-          ItemSeparatorComponent={() => <View style={styles.rowSeparator} />}
-        />
-      )}
-
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => navigation.navigate('AddStock')}
-      >
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
-    </View>
+      <FlatList
+        key={numCols}
+        data={filteredStocks}
+        keyExtractor={(item) => item._id}
+        numColumns={numCols}
+        renderItem={renderStockCard}
+        columnWrapperStyle={numCols > 1 ? styles.columnWrap : undefined}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No stock yet</Text>
+            <Text style={styles.emptyText}>Add vegetables or adjust your search.</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 };
 
-  const styles = StyleSheet.create({
-    tableContainer: {
-      padding: 15,
-      paddingBottom: 100,
-    },
-    tableHeader: {
-      flexDirection: 'row',
-      backgroundColor: '#F5F5F5',
-      paddingVertical: 12,
-      paddingHorizontal: 15,
-      marginBottom: 8,
-    },
-    tableHeaderText: {
-      flex: 1,
-      fontWeight: 'bold',
-      color: '#333',
-      fontSize: 16,
-      textAlign: 'left',
-    },
-    tableRow: {
-      flexDirection: 'row',
-      backgroundColor: '#FFFFFF',
-      paddingVertical: 12,
-      paddingHorizontal: 15,
-      borderRadius: 8,
-      marginBottom: 8,
-      elevation: 1,
-    },
-    cell: {
-      flex: 1.5,
-      justifyContent: 'center',
-    },
-    cellLast: {
-      flex: 1,
-      alignItems: 'flex-end',
-    },
-    cellText: {
-      fontSize: 16,
-      color: '#333',
-    },
-    rowSeparator: {
-      height: 1,
-      backgroundColor: '#E0E0E0',
-      marginHorizontal: 15,
-    },
-    headerButtons: {
-      flexDirection: 'row',
-      gap: 10,
-      marginTop: 10,
-    },
-    headerBtn: {
-      flex: 1,
-      paddingVertical: 10,
-      paddingHorizontal: 15,
-      backgroundColor: '#E0E0E0',
-      borderRadius: 8,
-      alignItems: 'center',
-    },
-    addBtn: {
-      backgroundColor: '#4CAF50',
-    },
-    headerBtnText: {
-      color: '#333',
-      fontWeight: '600',
-      fontSize: 14,
-    },
-    editBtn: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      backgroundColor: '#2196F3',
-      borderRadius: 6,
-    },
-    editBtnText: {
-      color: 'white',
-      fontWeight: 'bold',
-      fontSize: 12,
-    },
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f0fdf4'
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f0fdf4'
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
-    color: '#607D8B',
+    color: '#166534',
+    fontWeight: '700'
   },
   header: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    padding: 18,
+    backgroundColor: '#15803d',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
+  title: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
+    flex: 1
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#757575',
-    marginTop: 4,
+  addButton: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
-  searchContainer: {
-    padding: 15,
-    paddingBottom: 5,
+  addButtonText: {
+    color: '#15803d',
+    fontWeight: '900'
   },
   searchInput: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    fontSize: 16,
-  },
-  filterContainerWrapper: {
-    height: 60,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  filterLabel: {
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 5,
-  },
-  filterDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#CCC',
-    marginHorizontal: 5,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#EEEEEE',
-  },
-  filterChipActive: {
-    backgroundColor: '#4CAF50',
-  },
-  filterText: {
-    color: '#616161',
-    fontWeight: '600',
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
-  },
-  listContainer: {
-    padding: 15,
-    paddingBottom: 100,
-  },
-  card: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 15,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cardImage: {
-    width: 100,
-    height: '100%',
-    backgroundColor: '#EEEEEE',
-  },
-  cardContent: {
-    flex: 1,
-    padding: 15,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginBottom: 4,
-  },
-  cardPrice: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  cardSub: {
-    fontSize: 14,
-    color: '#757575',
+    margin: 16,
     marginBottom: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24
+  },
+  columnWrap: {
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 4
+  },
+  gridCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4
+  },
+  imageSquareWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#e5e7eb'
+  },
+  squareImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  },
+  imagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  imagePlaceholderText: {
+    color: '#64748b',
+    fontWeight: '700'
+  },
+  cardDetails: {
+    padding: 12
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8
+  },
+  stockName: {
+    flex: 1,
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '900'
   },
   statusBadge: {
-    alignSelf: 'flex-start',
+    borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden'
   },
-  statusText: {
+  availableBadge: {
+    color: '#166534',
+    backgroundColor: '#dcfce7'
+  },
+  unavailableBadge: {
+    color: '#991b1b',
+    backgroundColor: '#fee2e2'
+  },
+  categoryText: {
+    color: '#64748b',
+    fontWeight: '600',
+    fontSize: 13,
+    marginTop: 6
+  },
+  riskPill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8
+  },
+  riskPillText: {
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  metaBlock: {
+    marginTop: 8
+  },
+  metaLabel: {
+    color: '#6b7280',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase'
+  },
+  metaValue: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 2
+  },
+  priceValue: {
+    color: '#15803d',
+    fontSize: 15,
+    fontWeight: '900',
+    marginTop: 2
+  },
+  marketHint: {
+    marginTop: 10,
     fontSize: 12,
-    fontWeight: 'bold',
+    color: '#64748b',
+    fontWeight: '600'
   },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+  marketRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
   },
-  fabIcon: {
-    fontSize: 32,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    lineHeight: 34,
-  },
-  emptyContainer: {
+  marketBtn: {
     flex: 1,
-    justifyContent: 'center',
+    minWidth: 120,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  marketBtnSecondary: {
+    flex: 1,
+    minWidth: 120,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  marketBtnText: {
+    color: '#166534',
+    fontWeight: '800',
+    fontSize: 12
+  },
+  marketBtnTextSecondary: {
+    color: '#1d4ed8',
+    fontWeight: '800',
+    fontSize: 12
+  },
+  actionRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    gap: 10
+  },
+  editButton: {
+    flex: 1,
+    backgroundColor: '#dbeafe',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  editButtonText: {
+    color: '#1d4ed8',
+    fontWeight: '900'
+  },
+  deleteButton: {
+    flex: 1,
+    backgroundColor: '#fee2e2',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  deleteButtonText: {
+    color: '#991b1b',
+    fontWeight: '900'
+  },
+  viewLink: {
+    marginTop: 10,
+    alignItems: 'center'
+  },
+  viewLinkText: {
+    color: '#2563eb',
+    fontWeight: '700',
+    fontSize: 13
+  },
+  emptyState: {
     alignItems: 'center',
-    padding: 30,
+    justifyContent: 'center',
+    paddingVertical: 70
+  },
+  emptyTitle: {
+    color: '#111827',
+    fontSize: 20,
+    fontWeight: '900'
   },
   emptyText: {
-    fontSize: 16,
-    color: '#9E9E9E',
-    marginBottom: 15,
-  },
-  clearButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 8,
-  },
-  clearButtonText: {
-    color: '#424242',
-    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 8,
+    fontWeight: '700',
+    textAlign: 'center'
   }
 });
 

@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, AuthContext } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
+import { NotificationProvider } from '../context/NotificationContext';
 import { ActivityIndicator, View } from 'react-native';
 
 // Screens
@@ -24,7 +25,12 @@ import OrderDetailsScreen from '../screens/farmer/OrderDetailsScreen';
 import PaymentHistoryScreen from '../screens/farmer/PaymentHistoryScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 import CartScreen from '../screens/customer/CartScreen';
+import CustomerOrdersScreen from '../screens/customer/CustomerOrdersScreen';
+import CustomerOrderDetailScreen from '../screens/customer/CustomerOrderDetailScreen';
 import LandingScreen from '../screens/public/LandingScreen';
+import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
+import AdminOrderDetailScreen from '../screens/admin/AdminOrderDetailScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -46,6 +52,7 @@ const FarmerStack = () => (
     <Stack.Screen name="BulkOperations" component={BulkOperationsScreen} options={{ title: 'Bulk Operations' }} />
     <Stack.Screen name="MyOrders" component={MyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ title: 'Order Details' }} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Payments' }} />
   </Stack.Navigator>
 );
@@ -63,6 +70,9 @@ const AdminStack = () => (
     <Stack.Screen name="FarmerApproval" component={FarmerApprovalScreen} options={{ title: 'Pending Approvals' }} />
     <Stack.Screen name="ManageFarmers" component={ManageFarmersScreen} options={{ title: 'Manage Farmers' }} />
     <Stack.Screen name="ManageCategories" component={ManageCategoriesScreen} options={{ title: 'Manage Categories' }} />
+    <Stack.Screen name="AdminOrders" component={AdminOrdersScreen} options={{ title: 'All Orders' }} />
+    <Stack.Screen name="AdminOrderDetail" component={AdminOrderDetailScreen} options={{ title: 'Order' }} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
   </Stack.Navigator>
 );
 
@@ -77,6 +87,9 @@ const CustomerStack = () => (
   >
     <Stack.Screen name="Marketplace" component={MarketplaceScreen} options={{ title: 'Fresh Marketplace' }} />
     <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'My Cart' }} />
+    <Stack.Screen name="CustomerOrders" component={CustomerOrdersScreen} options={{ title: 'My Orders' }} />
+    <Stack.Screen name="CustomerOrderDetail" component={CustomerOrderDetailScreen} options={{ title: 'Order' }} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
   </Stack.Navigator>
 );
 
@@ -90,6 +103,7 @@ const AuthStack = () => (
 
 const MainNavigation = () => {
   const { user, loading } = useContext(AuthContext);
+  const normalizedRole = (user?.role || '').toString().trim().toLowerCase();
 
   if (loading) {
     return (
@@ -99,12 +113,18 @@ const MainNavigation = () => {
     );
   }
 
+  // Remount the tree when auth/role changes so the correct stack shows (avoids getting stuck on Login after a successful sign-in).
+  const navKey = user
+    ? `app-${normalizedRole || 'unknown'}-${user._id || user.id || 'u'}`
+    : 'auth';
+
   return (
-    <NavigationContainer>
+    <NavigationContainer key={navKey}>
       {user ? (
-        user.role === 'Admin' ? <AdminStack /> :
-        user.role === 'Farmer' ? <FarmerStack /> :
-        <CustomerStack />
+        normalizedRole === 'admin' ? <AdminStack /> :
+        normalizedRole === 'farmer' ? <FarmerStack /> :
+        normalizedRole === 'customer' ? <CustomerStack /> :
+        <AuthStack />
       ) : (
         <AuthStack />
       )}
@@ -115,9 +135,11 @@ const MainNavigation = () => {
 const AppNavigator = () => {
   return (
     <AuthProvider>
-      <CartProvider>
-        <MainNavigation />
-      </CartProvider>
+      <NotificationProvider>
+        <CartProvider>
+          <MainNavigation />
+        </CartProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 };

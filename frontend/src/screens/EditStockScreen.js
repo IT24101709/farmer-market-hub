@@ -1,126 +1,165 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView,
-  Image,
-  Alert,
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import {
   ActivityIndicator,
-  Platform
+  Alert,
+  Image,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
-import { updateStock, deleteStock, getStockById } from '../services/stockService';
+import getEnvVars from '../config';
+import {
+  getStockById,
+  updateStockAvailability,
+  updateStockPrice,
+  updateStockQuantity,
+  updateStock
+} from '../services/stockService';
+
+const { apiUrl } = getEnvVars();
+const API_BASE = apiUrl.replace('/api', '');
+
+const imageUrlFor = (image) => {
+  if (!image) return null;
+  return image.startsWith('http') ? image : `${API_BASE}${image}`;
+};
 
 const EditStockScreen = ({ route, navigation }) => {
-  const { stockId } = route.params;
-  const { token } = useContext(AuthContext);
-  const [stock, setStock] = useState(null);
-  const [newQuantity, setNewQuantity] = useState('');
-  const [newPricePerKg, setNewPricePerKg] = useState('');
-  const [status, setStatus] = useState('Available');
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const stockId = route.params?.stockId || route.params?.stock?._id;
+  const { token, logout } = useContext(AuthContext);
+  const [stock, setStock] = useState(route.params?.stock || null);
+  const [quantity, setQuantity] = useState('');
+  const [pricePerKg, setPricePerKg] = useState('');
+  const [availabilityStatus, setAvailabilityStatus] = useState(true);
+  const [errors, setErrors] = useState({});
+  const [newImage, setNewImage] = useState(null);
+  const [loading, setLoading] = useState(!route.params?.stock);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const fetchStock = async () => {
+    const loadStock = async () => {
       try {
-        const fetchedStock = await getStockById(stockId, token);
-        setStock(fetchedStock);
-        setNewQuantity(fetchedStock.quantity.toString());
-        setNewPricePerKg(fetchedStock.pricePerKg.toString());
-        setStatus(fetchedStock.status);
+        if (!stockId || !token) return;
+        const data = await getStockById(stockId, token);
+        setStock(data);
+        setQuantity(String(data.quantity ?? ''));
+        setPricePerKg(String(data.pricePerKg ?? ''));
+        setAvailabilityStatus(data.availabilityStatus === true || data.status === 'Available');
       } catch (error) {
-        Alert.alert('Error', 'Failed to load stock');
+        if (error.status === 401) logout();
+        Alert.alert('Error', 'Failed to load stock.');
+        navigation.goBack();
       } finally {
         setLoading(false);
       }
     };
-    fetchStock();
+
+    if (route.params?.stock) {
+      const data = route.params.stock;
+      setQuantity(String(data.quantity ?? ''));
+      setPricePerKg(String(data.pricePerKg ?? ''));
+      setAvailabilityStatus(data.availabilityStatus === true || data.status === 'Available');
+    } else {
+      loadStock();
+    }
   }, [stockId, token]);
 
-  if (loading || !stock) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-  
-  const [newImage, setNewImage] = useState(null); // Local new image if selected
-  const [errors, setErrors] = useState({});
-
-  const originalImageUrl = stock.image.startsWith('http') 
-    ? stock.image 
-    : `http://localhost:5000${stock.image}`;
+  const imageUri = useMemo(() => newImage?.uri || imageUrlFor(stock?.image), [stock, newImage]);
 
   const pickImage = async () => {
-    const { status: permStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (permStatus !== 'granted') {
-      Alert.alert('Permission Denied', 'Camera roll permission is required.');
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Please allow gallery access to update the stock image.');
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.7
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
+    if (!result.canceled && result.assets?.length) {
       setNewImage(result.assets[0]);
     }
   };
 
   const validateForm = () => {
-    let isValid = true;
-    let newErrors = {};
+    const nextErrors = {};
+    const qty = Number(quantity);
+    const price = Number(pricePerKg);
 
-    if (!vegetableName.trim()) {
-      newErrors.vegetableName = 'Required';
-      isValid = false;
-    }
-    
-    if (!quantity || isNaN(quantity) || Number(quantity) < 0) {
-      newErrors.quantity = 'Invalid quantity';
-      isValid = false;
-    }
+    if (!Number.isFinite(qty) || qty < 0) nextErrors.quantity = 'Quantity must be a positive number or zero.';
+    if (!Number.isFinite(price) || price <= 0) nextErrors.pricePerKg = 'Price must be greater than 0.';
+    if (typeof availabilityStatus !== 'boolean') nextErrors.availabilityStatus = 'Select a status.';
+    if (newImage?.fileSize && newImage.fileSize > 2 * 1024 * 1024) nextErrors.image = 'Image must be 2 MB or less.';
 
-    if (!pricePerKg || isNaN(pricePerKg) || Number(pricePerKg) <= 0) {
-      newErrors.pricePerKg = 'Invalid price';
-      isValid = false;
-    }
-
-    if (!expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
-      newErrors.expiryDate = 'Format: YYYY-MM-DD';
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleQtyZero = () => {
+  const submitChanges = async () => {
+    if (!validateForm()) return;
+
     Alert.alert(
-      '⚠️ QUANTITY ZERO DETECTED',
-      'This stock will be automatically removed from your listing.',
+      'Confirm Update',
+      'Update this stock quantity, price, and availability status?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Confirm & Remove',
-          style: 'destructive',
+          text: 'Update',
           onPress: async () => {
             try {
-              await deleteStock(stock._id, token);
-              Alert.alert('Removed', 'Stock removed and moved to history.');
-              navigation.navigate('StockList');
+              setSaving(true);
+              const qty = Number(quantity);
+              const price = Number(pricePerKg);
+
+              if (qty !== Number(stock.quantity)) {
+                await updateStockQuantity(stock._id, qty, token);
+              }
+
+              if (price !== Number(stock.pricePerKg)) {
+                await updateStockPrice(stock._id, price, token);
+              }
+
+              const currentAvailability = stock.availabilityStatus === true || stock.status === 'Available';
+              if (availabilityStatus !== currentAvailability || qty === 0) {
+                await updateStockAvailability(stock._id, qty > 0 ? availabilityStatus : false, token);
+              }
+
+              if (newImage) {
+                const formData = new FormData();
+                const localUri = newImage.uri;
+                const filename = localUri.split('/').pop() || 'stock.jpg';
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
+
+                formData.append('image', {
+                  uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
+                  name: filename,
+                  type
+                });
+
+                await updateStock(stock._id, formData, token);
+              }
+
+              Alert.alert('Success', 'Stock updated successfully.', [
+                { text: 'OK', onPress: () => navigation.navigate('StockList') }
+              ]);
             } catch (error) {
-              Alert.alert('Error', 'Failed to remove stock.');
+              if (error.status === 401) logout();
+              Alert.alert('Error', error.message || 'Failed to update stock.');
+            } finally {
+              setSaving(false);
             }
           }
         }
@@ -128,288 +167,227 @@ const EditStockScreen = ({ route, navigation }) => {
     );
   };
 
-  const handleUpdate = async () => {
-    const qty = Number(newQuantity);
-    if (qty <= 0) {
-      handleQtyZero();
-      return;
-    }
-    if (!validateForm()) return;
-    proceedWithUpdate();
-  };
-
-  const proceedWithUpdate = async () => {
-    try {
-      setLoading(true);
-
-      let submitData;
-
-      // If new image is selected, send FormData (Multipart)
-      if (newImage) {
-        submitData = new FormData();
-        submitData.append('vegetableName', vegetableName);
-        submitData.append('quantity', quantity);
-        submitData.append('pricePerKg', pricePerKg);
-        submitData.append('expiryDate', expiryDate);
-        submitData.append('status', status);
-
-        const localUri = newImage.uri;
-        const filename = localUri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image`;
-
-        submitData.append('image', {
-          uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
-          name: filename,
-          type
-        });
-      } else {
-        // Otherwise, send JSON
-        submitData = {
-          vegetableName,
-          quantity: Number(quantity),
-          pricePerKg: Number(pricePerKg),
-          expiryDate,
-          status
-        };
-      }
-
-      const response = await updateStock(stock._id, submitData);
-      
-      // Auto-removal fallback UI logic
-      if (response.removed || Number(quantity) === 0) {
-        Alert.alert('Market Updated', 'Stock was removed due to zero quantity.');
-        navigation.navigate('StockList');
-      } else {
-        Alert.alert('Success', 'Stock updated successfully.');
-        navigation.goBack(); // Go back to Detail Screen
-      }
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update stock.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loading || !stock) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#16a34a" />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.formContainer}>
-        
-        <View style={styles.imageSection}>
-          <Text style={styles.label}>Vegetable Photo</Text>
-          <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-            <Image 
-              source={{ uri: newImage ? newImage.uri : originalImageUrl }} 
-              style={styles.previewImage} 
-            />
-            <View style={styles.imageOverlay}>
-              <Text style={styles.imageOverlayText}>Change Photo</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Edit Stock</Text>
+        <Text style={styles.subtitle}>{stock.vegetableName}</Text>
+
+        <TouchableOpacity style={styles.imageWrap} onPress={pickImage}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.image} />
+          ) : (
+            <View style={[styles.image, styles.imagePlaceholder]}>
+              <Text style={styles.imagePlaceholderText}>Add Image</Text>
             </View>
+          )}
+          <View style={styles.imageOverlay}>
+            <Text style={styles.imageOverlayText}>Change Photo</Text>
+          </View>
+        </TouchableOpacity>
+        {errors.image && <Text style={styles.errorText}>{errors.image}</Text>}
+
+        <View style={styles.formCard}>
+          <Text style={styles.label}>Quantity (kg)</Text>
+          <TextInput
+            style={[styles.input, errors.quantity && styles.inputError]}
+            keyboardType="numeric"
+            value={quantity}
+            onChangeText={(value) => {
+              setQuantity(value.replace(/[^0-9.]/g, ''));
+              if (errors.quantity) setErrors(current => ({ ...current, quantity: null }));
+            }}
+          />
+          {errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
+
+          <Text style={styles.label}>Price per kg (LKR)</Text>
+          <TextInput
+            style={[styles.input, errors.pricePerKg && styles.inputError]}
+            keyboardType="numeric"
+            value={pricePerKg}
+            onChangeText={(value) => {
+              setPricePerKg(value.replace(/[^0-9.]/g, ''));
+              if (errors.pricePerKg) setErrors(current => ({ ...current, pricePerKg: null }));
+            }}
+          />
+          {errors.pricePerKg && <Text style={styles.errorText}>{errors.pricePerKg}</Text>}
+
+          <Text style={styles.label}>Availability Status</Text>
+          <View style={styles.statusRow}>
+            <TouchableOpacity
+              style={[styles.statusButton, availabilityStatus && styles.statusActive]}
+              onPress={() => setAvailabilityStatus(true)}
+              disabled={Number(quantity) === 0}
+            >
+              <Text style={[styles.statusText, availabilityStatus && styles.statusTextActive]}>Available</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.statusButton, !availabilityStatus && styles.statusInactive]}
+              onPress={() => setAvailabilityStatus(false)}
+            >
+              <Text style={[styles.statusText, !availabilityStatus && styles.statusTextInactive]}>Unavailable</Text>
+            </TouchableOpacity>
+          </View>
+          {Number(quantity) === 0 && <Text style={styles.helpText}>Availability will be set to false when quantity is 0.</Text>}
+
+          <TouchableOpacity style={[styles.saveButton, saving && styles.disabled]} onPress={submitChanges} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save Changes</Text>}
           </TouchableOpacity>
         </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Vegetable Name</Text>
-          <TextInput
-            style={[styles.input, errors.vegetableName && styles.inputError]}
-            value={vegetableName}
-            onChangeText={(text) => {
-              setVegetableName(text);
-              if (errors.vegetableName) setErrors({...errors, vegetableName: null});
-            }}
-          />
-        </View>
-
-        <View style={styles.row}>
-          <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-            <Text style={styles.label}>Quantity (kg)</Text>
-            <TextInput
-              style={[styles.input, errors.quantity && styles.inputError]}
-              keyboardType="numeric"
-              value={quantity}
-              onChangeText={(text) => {
-                setQuantity(text);
-                if (errors.quantity) setErrors({...errors, quantity: null});
-              }}
-            />
-            {errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
-          </View>
-
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Price (LKR/kg)</Text>
-            <TextInput
-              style={[styles.input, errors.pricePerKg && styles.inputError]}
-              keyboardType="numeric"
-              value={pricePerKg}
-              onChangeText={(text) => {
-                setPricePerKg(text);
-                if (errors.pricePerKg) setErrors({...errors, pricePerKg: null});
-              }}
-            />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Expiry Date</Text>
-          <TextInput
-            style={[styles.input, errors.expiryDate && styles.inputError]}
-            placeholder="YYYY-MM-DD"
-            value={expiryDate}
-            onChangeText={(text) => {
-              setExpiryDate(text);
-              if (errors.expiryDate) setErrors({...errors, expiryDate: null});
-            }}
-          />
-          {errors.expiryDate && <Text style={styles.errorText}>{errors.expiryDate}</Text>}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Status</Text>
-          <View style={styles.statusChipsContainer}>
-            <TouchableOpacity 
-              style={[styles.statusChip, status === 'Available' && styles.statusChipActive]}
-              onPress={() => setStatus('Available')}
-            >
-              <Text style={[styles.statusChipText, status === 'Available' && styles.statusChipTextActive]}>Available</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.statusChip, status === 'Out of Stock' && styles.statusChipActiveOOS]}
-              onPress={() => setStatus('Out of Stock')}
-            >
-              <Text style={[styles.statusChipText, status === 'Out of Stock' && styles.statusChipTextActive]}>Out of Stock</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <TouchableOpacity 
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.submitButtonText}>Save Changes</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f4f8f1'
   },
-  contentContainer: {
-    paddingBottom: 40,
-  },
-  formContainer: {
-    padding: 20,
-  },
-  imageSection: {
-    marginBottom: 20,
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f4f8f1'
   },
-  imagePickerBtn: {
+  content: {
+    padding: 18
+  },
+  title: {
+    color: '#111827',
+    fontSize: 30,
+    fontWeight: '900'
+  },
+  subtitle: {
+    color: '#64748b',
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 4,
+    marginBottom: 16
+  },
+  imageWrap: {
     width: '100%',
-    height: 180,
+    height: 210,
     borderRadius: 12,
     overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#F5F5F5',
+    marginBottom: 16,
+    position: 'relative'
   },
-  previewImage: {
+  image: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#e5e7eb',
+  },
+  imagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  imagePlaceholderText: {
+    color: '#64748b',
+    fontWeight: '900'
   },
   imageOverlay: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   imageOverlayText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: '#fff',
+    fontWeight: '900'
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: 'row',
+  formCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#424242',
+    color: '#374151',
+    fontWeight: '900',
     marginBottom: 8,
+    marginTop: 14
   },
   input: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#d1d5db',
     borderRadius: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
-    color: '#212121',
+    color: '#111827',
+    fontSize: 16
   },
   inputError: {
-    borderColor: '#F44336',
+    borderColor: '#ef4444'
   },
   errorText: {
-    color: '#F44336',
+    color: '#dc2626',
     fontSize: 12,
-    marginTop: 5,
+    fontWeight: '700',
+    marginTop: 6
   },
-  statusChipsContainer: {
+  statusRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 10
   },
-  statusChip: {
+  statusButton: {
     flex: 1,
-    paddingVertical: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#d1d5db',
+    paddingVertical: 12,
+    alignItems: 'center'
+  },
+  statusActive: {
+    backgroundColor: '#dcfce7',
+    borderColor: '#22c55e'
+  },
+  statusInactive: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#ef4444'
+  },
+  statusText: {
+    color: '#374151',
+    fontWeight: '900'
+  },
+  statusTextActive: {
+    color: '#166534'
+  },
+  statusTextInactive: {
+    color: '#991b1b'
+  },
+  helpText: {
+    color: '#92400e',
+    fontWeight: '700',
+    marginTop: 8
+  },
+  saveButton: {
+    backgroundColor: '#16a34a',
     borderRadius: 8,
+    paddingVertical: 15,
     alignItems: 'center',
-    backgroundColor: '#FAFAFA',
+    marginTop: 24
   },
-  statusChipActive: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+  disabled: {
+    opacity: 0.65
   },
-  statusChipActiveOOS: {
-    backgroundColor: '#F44336',
-    borderColor: '#F44336',
-  },
-  statusChipText: {
-    color: '#757575',
-    fontWeight: '600',
-  },
-  statusChipTextActive: {
-    color: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#A5D6A7',
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+  saveText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900'
   }
 });
 

@@ -42,25 +42,29 @@ export const CartProvider = ({ children }) => {
   }, [cartItems]);
 
   const addToCart = (product) => {
-    setCartItems(prevItems => {
-      // Check if product already exists in cart (by stockId)
-      const existingItemIndex = prevItems.findIndex(item => item.stockId === product.stockId);
-      
+    const stockId = product.stockId || product._id;
+    const productName = product.name || product.vegetableName || 'Product';
+    const farmerRef = product.farmerId;
+
+    setCartItems((prevItems) => {
+      const existingItemIndex = prevItems.findIndex((item) => item.stockId === stockId);
+
       if (existingItemIndex >= 0) {
-        // Increase quantity
         const updatedItems = [...prevItems];
-        updatedItems[existingItemIndex].quantity += 1; // Default add 1 kg
+        updatedItems[existingItemIndex].quantity += 1;
         return updatedItems;
-      } else {
-        // Add new item
-        return [...prevItems, { 
-          stockId: product.stockId, 
-          product: product.vegetableName, 
-          price: product.pricePerKg, 
-          quantity: 1, // Default quantity
-          farmerId: product.farmerId
-        }];
       }
+
+      return [
+        ...prevItems,
+        {
+          stockId,
+          product: productName,
+          price: product.pricePerKg,
+          quantity: 1,
+          farmerId: farmerRef
+        }
+      ];
     });
   };
 

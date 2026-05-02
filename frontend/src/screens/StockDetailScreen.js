@@ -1,55 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Image, 
-  TouchableOpacity, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
   Alert,
   ActivityIndicator,
   ScrollView
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getStockById, deleteStock } from '../services/stockService';
 import { AuthContext } from '../context/AuthContext';
+import getEnvVars from '../config';
+
+const { apiUrl } = getEnvVars();
+const API_BASE = apiUrl.replace('/api', '');
+
+const imageUrlFor = (path) => {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${API_BASE}${path}`;
+};
+
+const riskColors = {
+  critical: { bg: '#fee2e2', fg: '#991b1b' },
+  high: { bg: '#ffedd5', fg: '#c2410c' },
+  medium: { bg: '#fef9c3', fg: '#a16207' },
+  low: { bg: '#ecfdf5', fg: '#166534' }
+};
 
 const StockDetailScreen = ({ route, navigation }) => {
-  const { token } = React.useContext(AuthContext);
+  const { token, logout } = React.useContext(AuthContext);
   const { stockId } = route.params;
   const [stock, setStock] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    const fetchStockDetail = async () => {
-      try {
-        const data = await getStockById(stockId, token);
-        setStock(data);
-      } catch (error) {
-        console.error(error);
-        Alert.alert('Error', 'Could not load stock details.');
-        navigation.goBack();
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchStockDetail = useCallback(async () => {
+    if (!token) {
+      setStock(null);
+      setLoading(false);
+      return;
+    }
+    try {
+      const data = await getStockById(stockId, token);
+      setStock(data);
+    } catch (error) {
+      console.error(error);
+      if (error.status === 401) logout();
+      Alert.alert('Error', error.message || 'Could not load stock details.');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  }, [stockId, token, logout, navigation]);
 
-    const unsubscribe = navigation.addListener('focus', () => {
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
       fetchStockDetail();
-    });
-
-    fetchStockDetail();
-    return unsubscribe;
-  }, [stockId, navigation]);
+    }, [fetchStockDetail])
+  );
 
   const handleDelete = () => {
     Alert.alert(
-      "Confirm Delete",
-      "Are you sure you want to remove this stock from the market?",
+      'Confirm Delete',
+      'Are you sure you want to remove this stock from the market?',
       [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
           onPress: async () => {
             try {
               setDeleting(true);
@@ -57,7 +78,8 @@ const StockDetailScreen = ({ route, navigation }) => {
               Alert.alert('Success', 'Stock removed successfully.');
               navigation.navigate('StockList');
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete stock.');
+              if (error.status === 401) logout();
+              Alert.alert('Error', error.message || 'Failed to delete stock.');
             } finally {
               setDeleting(false);
             }
@@ -78,66 +100,90 @@ const StockDetailScreen = ({ route, navigation }) => {
   if (!stock) return null;
 
   const isAvailable = stock.status === 'Available';
-  const imageUrl = stock.image.startsWith('http') 
-    ? stock.image 
-    : `http://localhost:5000${stock.image}`;
+  const imagePath = stock.imageUrl || stock.image;
+  const imageUrl = imageUrlFor(imagePath);
+
+  const displayName = stock.name || stock.vegetableName || 'Stock';
+  const riskLevel = String(stock.spoilageRiskLevel || 'low').toLowerCase();
+  const rc = riskColors[riskLevel] || riskColors.low;
+  const daysLeft =
+    stock.daysLeft !== undefined && stock.daysLeft !== null ? stock.daysLeft : null;
+  const wastageValue = Number(
+    stock.estimatedWastageValue != null
+      ? stock.estimatedWastageValue
+      : Number(stock.quantity || 0) * Number(stock.pricePerKg || 0)
+  );
 
   const formattedDate = new Date(stock.expiryDate).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric'
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 
   return (
     <ScrollView style={styles.container}>
-      <Image 
-        source={{ uri: imageUrl }} 
-        style={styles.heroImage}
-        resizeMode="cover"
-      />
-      
+      {imageUrl ? (
+        <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.heroImage, styles.imagePlaceholder]} />
+      )}
+
       <View style={styles.contentContainer}>
         <View style={styles.headerInfo}>
-          <Text style={styles.title}>{stock.vegetableName}</Text>
-          <View style={[
-            styles.statusBadge, 
-            { backgroundColor: isAvailable ? '#E8F5E9' : '#FFF3E0' }
-          ]}>
-            <Text style={[
-              styles.statusText, 
-              { color: isAvailable ? '#2E7D32' : '#E65100' }
-            ]}>
+          <Text style={styles.title}>{displayName}</Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: isAvailable ? '#E8F5E9' : '#FFF3E0' }
+            ]}
+          >
+            <Text
+              style={[styles.statusText, { color: isAvailable ? '#2E7D32' : '#E65100' }]}
+            >
               {stock.status}
             </Text>
           </View>
         </View>
 
+        <View style={[styles.riskBanner, { backgroundColor: rc.bg }]}>
+          <Text style={[styles.riskTitle, { color: rc.fg }]}>Spoilage risk: {riskLevel.toUpperCase()}</Text>
+          <Text style={[styles.riskSub, { color: rc.fg }]}>
+            {daysLeft !== null
+              ? `${daysLeft} day(s) to expiry · potential exposure LKR ${wastageValue.toFixed(2)}`
+              : `Potential exposure LKR ${wastageValue.toFixed(2)}`}
+          </Text>
+        </View>
+
         <View style={styles.card}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Price per Kg</Text>
-            <Text style={styles.detailValuePrice}>LKR {stock.pricePerKg}</Text>
+            <Text style={styles.detailLabel}>Price per kg</Text>
+            <Text style={styles.detailValuePrice}>LKR {Number(stock.pricePerKg || 0).toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
-          
+
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Available Quantity</Text>
-            <Text style={styles.detailValue}>{stock.quantity} kg</Text>
+            <Text style={styles.detailLabel}>Available quantity</Text>
+            <Text style={styles.detailValue}>
+              {stock.quantity} {stock.unit || 'kg'}
+            </Text>
           </View>
           <View style={styles.divider} />
-          
+
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Expiry Date</Text>
+            <Text style={styles.detailLabel}>Expiry date</Text>
             <Text style={styles.detailValue}>{formattedDate}</Text>
           </View>
         </View>
 
         <View style={styles.actionContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.button, styles.editButton]}
-            onPress={() => navigation.navigate('EditStock', { stock })}
+            onPress={() => navigation.navigate('EditStock', { stock, stockId: stock._id })}
           >
-            <Text style={styles.editButtonText}>Edit Details</Text>
+            <Text style={styles.editButtonText}>Edit details</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[styles.button, styles.deleteButton]}
             onPress={handleDelete}
             disabled={deleting}
@@ -145,7 +191,7 @@ const StockDetailScreen = ({ route, navigation }) => {
             {deleting ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={styles.deleteButtonText}>Remove Stock</Text>
+              <Text style={styles.deleteButtonText}>Remove stock</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -157,46 +203,65 @@ const StockDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#F5F7FA'
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   heroImage: {
     width: '100%',
     height: 250,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#E0E0E0'
+  },
+  imagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   contentContainer: {
     padding: 20,
     marginTop: -20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#F5F7FA'
   },
   headerInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16
   },
   title: {
     fontSize: 26,
     fontWeight: 'bold',
     color: '#212121',
-    flex: 1,
+    flex: 1
   },
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    marginLeft: 10,
+    marginLeft: 10
   },
   statusText: {
     fontWeight: 'bold',
+    fontSize: 14
+  },
+  riskBanner: {
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16
+  },
+  riskTitle: {
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  riskSub: {
+    marginTop: 6,
     fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.95
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -207,62 +272,62 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 3
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 10
   },
   detailLabel: {
     fontSize: 16,
-    color: '#757575',
+    color: '#757575'
   },
   detailValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212121',
+    color: '#212121'
   },
   detailValuePrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#4CAF50'
   },
   divider: {
     height: 1,
     backgroundColor: '#EEEEEE',
-    marginVertical: 5,
+    marginVertical: 5
   },
   actionContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 15,
+    gap: 15
   },
   button: {
     flex: 1,
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   editButton: {
     backgroundColor: '#E8F5E9',
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#4CAF50'
   },
   editButtonText: {
     color: '#2E7D32',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
   deleteButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#F44336'
   },
   deleteButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   }
 });
 

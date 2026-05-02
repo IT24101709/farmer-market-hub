@@ -11,14 +11,11 @@ import {
 } from 'react-native';
 import { CartContext } from '../../context/CartContext';
 import { AuthContext } from '../../context/AuthContext';
-import axios from 'axios';
-import getEnvVars from '../../config';
-
-const { apiUrl } = getEnvVars();
+import { createOrder } from '../../services/orderService';
 
 const CartScreen = ({ navigation }) => {
   const { cartItems, totalAmount, updateQuantity, removeFromCart, clearCart } = useContext(CartContext);
-  const { user } = useContext(AuthContext);
+  const { user, token, logout } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = async () => {
@@ -26,27 +23,35 @@ const CartScreen = ({ navigation }) => {
       Alert.alert('Empty Cart', 'Please add some items to your cart first.');
       return;
     }
+    if (!token) {
+      Alert.alert('Sign in required', 'Please log in as a customer to place an order.');
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await axios.post(`${apiUrl}/orders`, {
-        customerName: user.name || 'Valued Customer',
-        items: cartItems
-      });
+      const response = await createOrder(
+        {
+          customerName: user?.name || 'Customer',
+          items: cartItems
+        },
+        token
+      );
 
-      if (response.data.success) {
-        Alert.alert(
-          'Order Placed!', 
-          'Your order has been placed successfully.',
-          [{ text: 'OK', onPress: () => {
-            clearCart();
-            navigation.navigate('Marketplace');
-          }}]
-        );
+      if (response.success) {
+        const placedId = response.data?._id || response.data?.id;
+        clearCart();
+        if (placedId) {
+          navigation.navigate('CustomerOrderDetail', { orderId: String(placedId) });
+        } else {
+          navigation.navigate('CustomerOrders');
+        }
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      Alert.alert('Checkout Failed', error.response?.data?.message || 'Something went wrong. Please try again.');
+      if (error.status === 401) logout();
+      const detail = error.errors?.length ? error.errors.join('\n') : error.message;
+      Alert.alert('Checkout failed', detail || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
