@@ -70,6 +70,18 @@ export const getDeliveryById = async (deliveryId, token) => {
   }
 };
 
+// Get delivery by order ID
+export const getDeliveryByOrderId = async (orderId, token) => {
+  try {
+    const response = await axios.get(`${API_URL}/order/${orderId}`, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to load delivery for order');
+  }
+};
+
 // Assign agent (admin)
 export const assignAgent = async (deliveryId, agentId, token) => {
   try {

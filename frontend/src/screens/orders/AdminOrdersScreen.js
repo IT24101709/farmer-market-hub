@@ -104,6 +104,9 @@ const AdminOrdersScreen = ({ navigation }) => {
       // Normalize to lowercase — backend updateOrderStatus accepts lowercase
       await updateOrderStatus(orderId, newStatus.toLowerCase(), null, token);
       await load();
+      if (newStatus === 'CONFIRMED') {
+        navigation.navigate('AdminDeliveries');
+      }
     } catch (e) {
       console.error(e);
       if (e?.status === 401) logout();

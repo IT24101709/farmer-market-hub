@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { getOrderById, updateOrder } from '../../services/orderService';
+import { getOrderById, updateOrderStatus } from '../../services/orderService';
 
-const STATUSES = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+const STATUSES = ['PENDING', 'CONFIRMED', 'CANCELLED'];
 
 const AdminOrderDetailScreen = ({ route, navigation }) => {
   const { orderId } = route.params;
@@ -50,8 +50,11 @@ const AdminOrderDetailScreen = ({ route, navigation }) => {
         onPress: async () => {
           setBusy(true);
           try {
-            await updateOrder(orderId, { status }, token);
+            await updateOrderStatus(orderId, status.toLowerCase(), null, token);
             await load();
+            if (status === 'CONFIRMED') {
+              navigation.navigate('AdminDeliveries');
+            }
           } catch (e) {
             Alert.alert('Error', e.message || 'Update failed');
           } finally {

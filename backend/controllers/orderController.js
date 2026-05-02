@@ -706,14 +706,18 @@ exports.updateOrderStatus = async (req, res) => {
 
     // Auto-create Delivery record when status becomes 'confirmed'
     if (normalizedStatus === 'confirmed' && oldStatus !== 'CONFIRMED' && oldStatus !== 'confirmed') {
-      const itemsList = (order.items || []).map(i => `${i.product} x ${i.quantity}kg`).join(', ');
-      await Delivery.create({
+      await Delivery.findOneAndUpdate({
         orderId: order._id,
-        customerName: order.customerName || 'Customer',
-        customerAddress: order.deliveryAddress || '',
-        items: itemsList,
-        amount: order.totalAmount,
-        status: 'Pending'
+      }, {
+        orderId: order._id,
+        customerId: order.customerId,
+        deliveryAddress: order.deliveryAddress || 'Address not provided',
+        note: order.note || '',
+        status: 'pending'
+      }, {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
       });
     }
 

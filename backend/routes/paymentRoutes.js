@@ -5,7 +5,8 @@ const {
   getOverview,
   getMyPayments,
   getPaymentByOrderId,
-  getPaymentById
+  getPaymentById,
+  updatePaymentStatus
 } = require('../controllers/paymentController');
 const { protect, adminRole, customerRole } = require('../middleware/authMiddleware');
 
@@ -23,6 +24,9 @@ router.get('/my', customerRole, getMyPayments);
 
 // Any authenticated user: payment by order ID (must come before /:id)
 router.get('/order/:orderId', getPaymentByOrderId);
+
+// Admin: update status manually
+router.patch('/:id/status', adminRole, updatePaymentStatus);
 
 // Any authenticated user: payment by payment ID
 router.get('/:id', getPaymentById);

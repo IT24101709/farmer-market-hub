@@ -1,5 +1,6 @@
 const Delivery = require('../models/Delivery');
 const Order = require('../models/Order');
+const Payment = require('../models/Payment');
 const User = require('../models/User');
 const { notifyUser } = require('../utils/orderNotifications');
 
@@ -115,8 +116,40 @@ exports.getDeliveryById = async (req, res) => {
 
     const userId = uid(req.user);
     const isAdmin = req.user.role === 'Admin';
-    const isAgent = String(delivery.agentId) === userId;
-    const isCustomer = String(delivery.customerId) === userId;
+    const isAgent = String(delivery.agentId?._id || delivery.agentId) === userId;
+    const isCustomer = String(delivery.customerId?._id || delivery.customerId) === userId;
+
+    if (!isAdmin && !isAgent && !isCustomer) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: delivery
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get delivery by order ID
+// @route   GET /api/deliveries/order/:orderId
+// @access  Private
+exports.getDeliveryByOrderId = async (req, res) => {
+  try {
+    const delivery = await Delivery.findOne({ orderId: req.params.orderId })
+      .populate('orderId', 'items totalAmount customerName')
+      .populate('agentId', 'name email')
+      .populate('customerId', 'name email');
+
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found for this order' });
+    }
+
+    const userId = uid(req.user);
+    const isAdmin = req.user.role === 'Admin';
+    const isAgent = String(delivery.agentId?._id || delivery.agentId) === userId;
+    const isCustomer = String(delivery.customerId?._id || delivery.customerId) === userId;
 
     if (!isAdmin && !isAgent && !isCustomer) {
       return res.status(403).json({ message: 'Access denied' });
@@ -222,10 +255,31 @@ exports.updateStatus = async (req, res) => {
       delivery.deliveredAt = new Date();
       
       // Update linked Order status to completed
-      await Order.findByIdAndUpdate(delivery.orderId, { 
-        status: 'completed',
+      const order = await Order.findByIdAndUpdate(delivery.orderId, { 
+        status: 'DELIVERED',
         legacyStatus: 'Delivered'
-      });
+      }, { new: true });
+
+      const existingPayment = await Payment.findOne({ orderId: delivery.orderId });
+      if (existingPayment) {
+        if (existingPayment.paymentStatus === 'PENDING') {
+          existingPayment.paymentStatus = 'SUCCESS';
+          existingPayment.note = [existingPayment.note, 'Auto-marked paid after delivery']
+            .filter(Boolean)
+            .join(' | ');
+          await existingPayment.save();
+        }
+      } else if (order?.customerId) {
+        await Payment.create({
+          orderId: order._id,
+          customerId: order.customerId,
+          paymentMethod: 'CASH',
+          paymentStatus: 'SUCCESS',
+          transactionReference: `COD${String(order._id).slice(-8).toUpperCase()}`,
+          amount: order.totalAmount,
+          note: 'Auto-created as paid after delivery'
+        });
+      }
 
       // Notify customer
       if (delivery.customerId) {

@@ -40,7 +40,7 @@ const formatDate = (d) => {
 
 const DeliveryDetailScreen = ({ route, navigation }) => {
   const { deliveryId } = route.params;
-  const { token, logout } = useContext(AuthContext);
+  const { token, user, logout } = useContext(AuthContext);
   const [delivery, setDelivery] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -128,6 +128,7 @@ const DeliveryDetailScreen = ({ route, navigation }) => {
   const agentEmail = delivery.agentId?.email || '';
   const customerName = delivery.customerId?.name || 'Unknown';
   const customerEmail = delivery.customerId?.email || '';
+  const isAdmin = (user?.role || '').toString().toLowerCase() === 'admin';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -191,7 +192,7 @@ const DeliveryDetailScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      {(delivery.status === 'pending' || delivery.status === 'assigned') && (
+      {isAdmin && (delivery.status === 'pending' || delivery.status === 'assigned') && (
         <TouchableOpacity
           style={[styles.cancelBtn, busy && styles.disabled]}
           onPress={handleCancel}

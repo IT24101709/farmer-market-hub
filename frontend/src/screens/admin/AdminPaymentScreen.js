@@ -74,7 +74,11 @@ const AdminPaymentScreen = ({ navigation }) => {
     const orderId = item.orderId?._id || item.orderId;
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate('PaymentDetail', { paymentId: item._id })}
+        activeOpacity={0.85}
+      >
         <View style={styles.cardHeader}>
           <View style={styles.methodRow}>
             <Text style={styles.methodIcon}>{icon}</Text>
@@ -102,7 +106,7 @@ const AdminPaymentScreen = ({ navigation }) => {
             <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

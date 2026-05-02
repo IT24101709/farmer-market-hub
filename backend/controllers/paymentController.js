@@ -53,7 +53,7 @@ exports.processPayment = async (req, res) => {
       orderId,
       customerId,
       paymentMethod: String(paymentMethod).toUpperCase(),
-      paymentStatus: 'SUCCESS',
+      paymentStatus: String(paymentMethod).toUpperCase() === 'CASH' ? 'PENDING' : 'SUCCESS',
       transactionReference: generateTransactionRef(),
       amount: order.totalAmount,
       note: note || ''
@@ -68,6 +68,44 @@ exports.processPayment = async (req, res) => {
       success: true,
       data: populated,
       message: 'Payment processed successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Admin updates a payment status
+// @route   PATCH /api/payments/:id/status
+// @access  Private Admin
+exports.updatePaymentStatus = async (req, res) => {
+  try {
+    const { paymentStatus, note } = req.body;
+    const normalizedStatus = String(paymentStatus || '').toUpperCase();
+    const validStatuses = ['PENDING', 'SUCCESS', 'FAILED'];
+
+    if (!validStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({ message: `Invalid payment status. Valid: ${validStatuses.join(', ')}` });
+    }
+
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    payment.paymentStatus = normalizedStatus;
+    if (typeof note === 'string') {
+      payment.note = note.trim();
+    }
+    await payment.save();
+
+    const populated = await Payment.findById(payment._id)
+      .populate('orderId', 'totalAmount customerName status items')
+      .populate('customerId', 'name email');
+
+    res.status(200).json({
+      success: true,
+      data: populated,
+      message: `Payment status updated to ${normalizedStatus}`
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

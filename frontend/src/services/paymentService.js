@@ -82,3 +82,17 @@ export const getPaymentById = async (paymentId, token) => {
     throw normalizeError(error, 'Failed to load payment');
   }
 };
+
+// PATCH /api/payments/:id/status — Admin updates payment status
+export const updatePaymentStatus = async (paymentId, paymentStatus, note, token) => {
+  try {
+    const response = await axios.patch(
+      `${API_URL}/${paymentId}/status`,
+      { paymentStatus, note: note || '' },
+      { headers: authHeaders(token) }
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to update payment status');
+  }
+};

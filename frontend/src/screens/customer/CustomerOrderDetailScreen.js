@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { getOrderById, updateOrder } from '../../services/orderService';
+import { getDeliveryByOrderId } from '../../services/deliveryService';
 
 const formatDate = (d) => {
   if (!d) return '—';
@@ -78,6 +79,20 @@ const CustomerOrderDetailScreen = ({ route, navigation }) => {
     ]);
   };
 
+  const trackDelivery = async () => {
+    setBusy(true);
+    try {
+      const res = await getDeliveryByOrderId(orderId, token);
+      if (res.data?._id) {
+        navigation.navigate('DeliveryDetail', { deliveryId: res.data._id });
+      }
+    } catch (e) {
+      Alert.alert('Delivery not ready', e.message || 'Delivery tracking is not available yet.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -104,12 +119,15 @@ const CustomerOrderDetailScreen = ({ route, navigation }) => {
     { key: 'Delivered', label: 'Delivered' }
   ];
   const statusOrder = ['Pending', 'Processing', 'Shipped', 'Delivered'];
-  const currentIdx = statusOrder.indexOf(order.status);
+  const displayStatus = order.legacyStatus || order.status;
+  const currentIdx = statusOrder.indexOf(displayStatus);
+  const canTrack = ['CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'Processing', 'Shipped', 'Delivered']
+    .includes(order.status) || ['Processing', 'Shipped', 'Delivered'].includes(order.legacyStatus);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Order #{String(order._id).slice(-8).toUpperCase()}</Text>
-      <Text style={styles.status}>Status: {order.status}</Text>
+      <Text style={styles.status}>Status: {displayStatus}</Text>
       <Text style={styles.meta}>Placed: {formatDate(order.createdAt)}</Text>
 
       {order.status !== 'Cancelled' && (
@@ -149,6 +167,16 @@ const CustomerOrderDetailScreen = ({ route, navigation }) => {
           disabled={busy}
         >
           <Text style={styles.cancelBtnText}>Cancel order</Text>
+        </TouchableOpacity>
+      )}
+
+      {canTrack && (
+        <TouchableOpacity
+          style={[styles.trackBtn, busy && styles.disabled]}
+          onPress={trackDelivery}
+          disabled={busy}
+        >
+          <Text style={styles.trackBtnText}>Track Delivery</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -196,6 +224,16 @@ const styles = StyleSheet.create({
     borderColor: '#fecaca'
   },
   cancelBtnText: { color: '#991b1b', fontWeight: '900' },
+  trackBtn: {
+    marginTop: 18,
+    backgroundColor: '#dbeafe',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#bfdbfe'
+  },
+  trackBtnText: { color: '#1d4ed8', fontWeight: '900' },
   disabled: { opacity: 0.6 },
   muted: { color: '#64748b', fontWeight: '600' },
   btn: { marginTop: 16, backgroundColor: '#2196F3', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },

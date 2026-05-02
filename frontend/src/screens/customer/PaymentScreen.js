@@ -46,17 +46,22 @@ const PaymentScreen = ({ route, navigation }) => {
       setLoading(true);
       try {
         await processPayment({ orderId, paymentMethod: selectedMethod }, token);
-        const msg = 'Payment processed successfully!';
+        const msg = '✅ Payment processed successfully! Your order is now being handled.';
         if (Platform.OS === 'web') {
           window.alert(msg);
-          navigation.goBack();
+          navigation.navigate('CustomerOrderDetail', { orderId });
         } else {
-          Alert.alert('Success', msg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+          Alert.alert('Payment Successful', msg, [
+            {
+              text: 'View Order',
+              onPress: () => navigation.navigate('CustomerOrderDetail', { orderId })
+            }
+          ]);
         }
       } catch (e) {
         const msg = e.message || 'Failed to process payment.';
         if (Platform.OS === 'web') { window.alert('Error: ' + msg); }
-        else { Alert.alert('Error', msg); }
+        else { Alert.alert('Payment Error', msg); }
       } finally {
         setLoading(false);
       }
@@ -123,6 +128,20 @@ const PaymentScreen = ({ route, navigation }) => {
             </Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.skipBtn}
+          onPress={() => navigation.navigate('CustomerOrderDetail', { orderId })}
+        >
+          <Text style={styles.skipBtnText}>View Order Status →</Text>
+        </TouchableOpacity>
+
+        <View style={styles.noteBox}>
+          <Text style={styles.noteText}>
+            ℹ️  Payment can only be processed after the farmer confirms your order.
+            You can always pay later from your order details.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -187,7 +206,22 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   payBtnDisabled: { opacity: 0.6 },
-  payBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' }
+  payBtnText: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  skipBtn: {
+    marginTop: 14,
+    paddingVertical: 14,
+    alignItems: 'center'
+  },
+  skipBtnText: { color: '#2563eb', fontSize: 15, fontWeight: '700' },
+  noteBox: {
+    marginTop: 16,
+    padding: 14,
+    backgroundColor: '#eff6ff',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#93c5fd'
+  },
+  noteText: { color: '#1e3a5f', fontSize: 13, lineHeight: 20 }
 });
 
 export default PaymentScreen;

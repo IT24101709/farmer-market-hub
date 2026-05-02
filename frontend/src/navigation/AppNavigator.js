@@ -46,6 +46,7 @@ import AgentDeliveryDetailScreen from '../screens/delivery/AgentDeliveryDetailSc
 import PaymentScreen from '../screens/customer/PaymentScreen';
 import CustomerPaymentHistoryScreen from '../screens/customer/CustomerPaymentHistoryScreen';
 import AdminPaymentScreen from '../screens/admin/AdminPaymentScreen';
+import PaymentDetailScreen from '../screens/admin/PaymentDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -90,6 +91,7 @@ const AdminStack = () => (
     <Stack.Screen name="AdminDeliveries" component={AdminDeliveriesScreen} options={{ title: 'Deliveries' }} />
     <Stack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} options={{ title: 'Delivery Details' }} />
     <Stack.Screen name="AdminPayments" component={AdminPaymentScreen} options={{ title: 'Payments' }} />
+    <Stack.Screen name="PaymentDetail" component={PaymentDetailScreen} options={{ title: 'Payment Detail' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
   </Stack.Navigator>
 );
@@ -124,9 +126,11 @@ const CustomerStack = () => (
     <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'My Cart' }} />
     <Stack.Screen name="CustomerOrders" component={CustomerOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="CustomerOrderDetail" component={CustomerOrderDetailScreen} options={{ title: 'Order' }} />
+    <Stack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} options={{ title: 'Track Delivery' }} />
     <Stack.Screen name="PlaceOrder" component={PlaceOrderScreen} options={{ title: 'Place Order' }} />
     <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
+    <Stack.Screen name="PaymentDetail" component={PaymentDetailScreen} options={{ title: 'Payment Detail' }} />
     <Stack.Screen name="PaymentHistory" component={CustomerPaymentHistoryScreen} options={{ title: 'Payment History' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
   </Stack.Navigator>

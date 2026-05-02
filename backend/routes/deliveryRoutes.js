@@ -6,6 +6,7 @@ const {
   getAllDeliveries,
   getMyDeliveries,
   getDeliveryById,
+  getDeliveryByOrderId,
   assignAgent,
   updateStatus,
   cancelDelivery
@@ -30,6 +31,11 @@ router.get('/', adminRole, getAllDeliveries);
 // @desc    Get agent's deliveries
 // @access  Private DeliveryAgent
 router.get('/my', deliveryAgentRole, getMyDeliveries);
+
+// @route   GET /api/deliveries/order/:orderId
+// @desc    Get delivery by order ID
+// @access  Private
+router.get('/order/:orderId', getDeliveryByOrderId);
 
 // @route   GET /api/deliveries/:id
 // @desc    Get delivery by ID
