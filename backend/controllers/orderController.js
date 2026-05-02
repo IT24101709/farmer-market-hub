@@ -11,6 +11,28 @@ const normalizeFarmerId = (f) => {
 
 const uid = (user) => String(user?.id || user?._id || '');
 
+async function ensureDeliveryForOrder(order) {
+  if (!order?.customerId) {
+    throw new Error('Order cannot be sent to delivery without a customer');
+  }
+
+  return Delivery.findOneAndUpdate(
+    { orderId: order._id },
+    {
+      orderId: order._id,
+      customerId: order.customerId,
+      deliveryAddress: order.deliveryAddress || 'Address not provided',
+      note: order.note || '',
+      status: 'pending'
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
+    }
+  );
+}
+
 async function validateOrderLines(items) {
   const errors = [];
   for (const raw of items) {
@@ -232,6 +254,7 @@ if (isFarmer && status === 'READY_FOR_DELIVERY' && order.status === 'CONFIRMED')
       order.status = 'READY_FOR_DELIVERY';
       order.legacyStatus = 'Processing';
       await order.save();
+      await ensureDeliveryForOrder(order);
       if (order.customerId) {
         await notifyUser(String(order.customerId), {
           title: 'Order ready for delivery',
@@ -391,6 +414,7 @@ exports.sendToDelivery = async (req, res) => {
     order.status = 'READY_FOR_DELIVERY';
     order.legacyStatus = 'Processing';
     await order.save();
+    await ensureDeliveryForOrder(order);
 
     res.status(200).json({
       success: true,
@@ -706,19 +730,7 @@ exports.updateOrderStatus = async (req, res) => {
 
     // Auto-create Delivery record when status becomes 'confirmed'
     if (normalizedStatus === 'confirmed' && oldStatus !== 'CONFIRMED' && oldStatus !== 'confirmed') {
-      await Delivery.findOneAndUpdate({
-        orderId: order._id,
-      }, {
-        orderId: order._id,
-        customerId: order.customerId,
-        deliveryAddress: order.deliveryAddress || 'Address not provided',
-        note: order.note || '',
-        status: 'pending'
-      }, {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true
-      });
+      await ensureDeliveryForOrder(order);
     }
 
     // Notify customer

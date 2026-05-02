@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -76,15 +77,43 @@ const load = async () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await load();
-      Alert.alert('Updated', `Order status set to ${nextStatus}.`);
+      showMessage('Updated', `Order status set to ${nextStatus}.`);
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Could not update order.');
+      showMessage('Error', err.response?.data?.message || err.message || 'Could not update order.');
     } finally {
       setUpdating(false);
     }
   };
 
+  const showMessage = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(message || title);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
   const confirmPress = () => {
+    const run = async () => {
+      setUpdating(true);
+      try {
+        const res = await confirmFarmerOrder(orderId, token);
+        await load();
+        showMessage('Done', res.message || 'Your items are confirmed and stock has been reserved.');
+      } catch (err) {
+        showMessage('Cannot confirm', err.message || 'Stock may have changed. Try again.');
+      } finally {
+        setUpdating(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Confirm and reserve quantity for your items on this order?')) {
+        run();
+      }
+      return;
+    }
+
     Alert.alert(
       'Confirm your produce',
       'We will check stock again and reserve quantity for your items on this order.',
@@ -92,24 +121,20 @@ const load = async () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
-          onPress: async () => {
-            setUpdating(true);
-            try {
-              await confirmFarmerOrder(orderId, token);
-              await load();
-              Alert.alert('Done', 'Your items are confirmed and stock has been reserved.');
-            } catch (err) {
-              Alert.alert('Cannot confirm', err.message || 'Stock may have changed. Try again.');
-            } finally {
-              setUpdating(false);
-            }
-          }
+          onPress: run
         }
       ]
     );
   };
 
   const readyForDeliveryPress = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Mark this order as ready for delivery module?')) {
+        updateStatus('READY_FOR_DELIVERY');
+      }
+      return;
+    }
+
     Alert.alert('Ready for delivery', 'Mark this order as ready for delivery module?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Confirm', onPress: () => updateStatus('READY_FOR_DELIVERY') }

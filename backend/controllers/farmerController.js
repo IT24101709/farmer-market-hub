@@ -277,7 +277,7 @@ exports.confirmFarmerOrderLines = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-    if (order.status === 'Cancelled') {
+    if (order.status === 'Cancelled' || order.status === 'CANCELLED') {
       return res.status(400).json({ message: 'Order is cancelled' });
     }
 

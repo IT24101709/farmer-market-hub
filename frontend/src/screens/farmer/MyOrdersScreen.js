@@ -1,7 +1,9 @@
 import React, { useCallback, useContext, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Platform,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -11,7 +13,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { getFarmerOrders } from '../../services/farmerService';
+import { confirmFarmerOrder, getFarmerOrders } from '../../services/farmerService';
 
 const statusColor = (status) => {
   // Check both new UPPERCASE and legacy status names
@@ -109,6 +111,7 @@ const MyOrdersScreen = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmingId, setConfirmingId] = useState(null);
 
   const farmerId = user?.id || user?._id;
 
@@ -138,18 +141,56 @@ const MyOrdersScreen = ({ navigation }) => {
     load();
   };
 
+  const showMessage = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(message || title);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
+  const handleConfirm = async (orderId) => {
+    if (!token || !orderId) return;
+
+    const run = async () => {
+      setConfirmingId(orderId);
+      try {
+        const res = await confirmFarmerOrder(orderId, token);
+        await load();
+        showMessage('Confirmed', res.message || 'Your items are confirmed and stock has been reserved.');
+      } catch (e) {
+        showMessage('Cannot confirm', e.message || 'Stock may have changed. Try again.');
+      } finally {
+        setConfirmingId(null);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Confirm your stock for this order?')) {
+        run();
+      }
+      return;
+    }
+
+    Alert.alert('Confirm your stock', 'Confirm and reserve quantity for your items on this order?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', onPress: run }
+    ]);
+  };
+
   const renderOrder = ({ item }) => {
     const sub = farmerSubtotal(item, farmerId);
     const shortId = item._id ? String(item._id).slice(-8).toUpperCase() : '—';
     const { label: farmerStatusLabel, colorKey } = farmerFacingStatusSummary(item, farmerId);
     const pillColor = statusColor(colorKey);
+    const canConfirm =
+      (item.status === 'PENDING' || item.status === 'Pending') &&
+      Array.isArray(item.items) &&
+      item.items.some((line) => String(line.farmerId) === String(farmerId) && !line.farmerConfirmed);
+    const isConfirming = confirmingId === item._id;
 
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => navigation.navigate('OrderDetails', { orderId: item._id })}
-        activeOpacity={0.85}
-      >
+      <View style={styles.card}>
         <View style={styles.cardTop}>
           <Text style={styles.orderRef}>Order #{shortId}</Text>
           <View style={[styles.statusPill, { backgroundColor: `${pillColor}22` }]}>
@@ -162,8 +203,26 @@ const MyOrdersScreen = ({ navigation }) => {
           <Text style={styles.yourTotalLabel}>Your items total</Text>
           <Text style={styles.yourTotal}>LKR {sub.toFixed(2)}</Text>
         </View>
-        <Text style={styles.hint}>Tap to track, confirm, or view full order</Text>
-      </TouchableOpacity>
+        {canConfirm && (
+          <TouchableOpacity
+            style={[styles.confirmBtn, isConfirming && styles.btnDisabled]}
+            onPress={() => handleConfirm(item._id)}
+            disabled={isConfirming}
+          >
+            {isConfirming ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.confirmBtnText}>Confirm Order</Text>
+            )}
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.detailBtn}
+          onPress={() => navigation.navigate('OrderDetails', { orderId: item._id })}
+        >
+          <Text style={styles.detailBtnText}>View Details</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -242,6 +301,21 @@ const styles = StyleSheet.create({
   },
   yourTotalLabel: { color: '#64748b', fontWeight: '700', fontSize: 13 },
   yourTotal: { fontSize: 18, fontWeight: '900', color: '#15803d' },
+  confirmBtn: {
+    marginTop: 12,
+    backgroundColor: '#15803d',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center'
+  },
+  confirmBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  detailBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  detailBtnText: { color: '#15803d', fontWeight: '900', fontSize: 13 },
+  btnDisabled: { opacity: 0.65 },
   hint: { marginTop: 10, fontSize: 12, color: '#94a3b8', fontWeight: '600' },
   empty: { paddingVertical: 48, alignItems: 'center', paddingHorizontal: 24 },
   emptyTitle: { fontSize: 18, fontWeight: '900', color: '#374151' },
