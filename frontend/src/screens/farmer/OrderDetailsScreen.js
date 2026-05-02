@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { confirmFarmerOrder, getFarmerOrderById } from '../../services/farmerService';
+import { confirmFarmerOrder, getFarmerOrderPublic } from '../../services/farmerService';
 import getEnvVars from '../../config';
 import axios from 'axios';
 
@@ -41,10 +41,10 @@ const OrderDetailsScreen = ({ route, navigation }) => {
 
   const farmerId = user?.id || user?._id;
 
-  const load = async () => {
+const load = async () => {
     try {
       if (!token || !orderId) return;
-      const data = await getFarmerOrderById(orderId, token);
+      const data = await getFarmerOrderPublic(orderId, token);
       setOrder(data);
     } catch (e) {
       console.error(e);
@@ -107,17 +107,17 @@ const OrderDetailsScreen = ({ route, navigation }) => {
     );
   };
 
-  const shipPress = () => {
-    Alert.alert('Mark shipped', 'Mark this order as shipped to the customer?', [
+  const readyForDeliveryPress = () => {
+    Alert.alert('Ready for delivery', 'Mark this order as ready for delivery module?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Shipped', onPress: () => updateStatus('Shipped') }
+      { text: 'Confirm', onPress: () => updateStatus('READY_FOR_DELIVERY') }
     ]);
   };
 
   const deliveredPress = () => {
     Alert.alert('Mark delivered', 'Confirm delivery to the customer?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delivered', onPress: () => updateStatus('Delivered') }
+      { text: 'Delivered', onPress: () => updateStatus('DELIVERED') }
     ]);
   };
 
@@ -141,22 +141,35 @@ const OrderDetailsScreen = ({ route, navigation }) => {
   }
 
   const trackingSteps = [
-    { key: 'Pending', label: 'Order placed' },
-    { key: 'Processing', label: 'Confirmed / preparing' },
-    { key: 'Shipped', label: 'Shipped' },
-    { key: 'Delivered', label: 'Delivered' }
+    { key: 'PENDING', label: 'Order placed' },
+    { key: 'CONFIRMED', label: 'Confirmed by farmer' },
+    { key: 'READY_FOR_DELIVERY', label: 'Ready for delivery' },
+    { key: 'ASSIGNED', label: 'Agent assigned' },
+    { key: 'IN_TRANSIT', label: 'In transit' },
+    { key: 'DELIVERED', label: 'Delivered' }
   ];
-  const statusOrder = ['Pending', 'Processing', 'Shipped', 'Delivered'];
-  const currentIdx = statusOrder.indexOf(order.status);
+const statusOrder = ['PENDING', 'CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED'];
+  const displayStatus = order.status || order.legacyStatus || 'PENDING';
+  const currentIdx = statusOrder.indexOf(displayStatus);
+  const isCancelled = order.status === 'CANCELLED' || order.status === 'Cancelled';
+  const isFailed = order.status === 'FAILED_DELIVERY';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Order details</Text>
       <Text style={styles.orderId}>Ref: …{String(order._id).slice(-8).toUpperCase()}</Text>
 
-      <View style={styles.section}>
+<View style={styles.section}>
         <Text style={styles.sectionTitle}>Status</Text>
-        <Text style={styles.statusBig}>{order.status}</Text>
+        <Text style={styles.statusBig}>
+          {displayStatus === 'CONFIRMED' || displayStatus === 'Processing' ? 'Confirmed by farmer' :
+           displayStatus === 'READY_FOR_DELIVERY' ? 'Ready for delivery' :
+           displayStatus === 'ASSIGNED' ? 'Agent assigned' :
+           displayStatus === 'IN_TRANSIT' || displayStatus === 'Shipped' ? 'In transit' :
+           displayStatus === 'DELIVERED' || displayStatus === 'Delivered' ? 'Delivered' :
+           displayStatus === 'CANCELLED' || displayStatus === 'Cancelled' ? 'Cancelled' :
+           displayStatus === 'PENDING' || displayStatus === 'Pending' ? 'Pending' : order.status}
+        </Text>
         <Text style={styles.meta}>Placed: {formatDate(order.createdAt)}</Text>
         {order.updatedAt && order.updatedAt !== order.createdAt && (
           <Text style={styles.meta}>Last update: {formatDate(order.updatedAt)}</Text>
@@ -165,8 +178,10 @@ const OrderDetailsScreen = ({ route, navigation }) => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tracking</Text>
-        {order.status === 'Cancelled' ? (
+        {isCancelled ? (
           <Text style={styles.cancelledText}>This order was cancelled.</Text>
+        ) : isFailed ? (
+          <Text style={styles.failedText}>Delivery failed. Please contact support.</Text>
         ) : (
           trackingSteps.map((step) => {
             const stepIdx = statusOrder.indexOf(step.key);
@@ -214,8 +229,8 @@ const OrderDetailsScreen = ({ route, navigation }) => {
         <Text style={styles.orderGrand}>Full order total: LKR {Number(order.totalAmount || 0).toFixed(2)}</Text>
       </View>
 
-      <View style={styles.actions}>
-        {order.status === 'Pending' && myItems.some((l) => !l.farmerConfirmed) && (
+<View style={styles.actions}>
+        {(order.status === 'PENDING' || order.status === 'Pending') && myItems.some((l) => !l.farmerConfirmed) && (
           <TouchableOpacity
             style={[styles.primaryBtn, updating && styles.btnDisabled]}
             onPress={confirmPress}
@@ -224,16 +239,21 @@ const OrderDetailsScreen = ({ route, navigation }) => {
             <Text style={styles.primaryBtnText}>Confirm my stock</Text>
           </TouchableOpacity>
         )}
-        {order.status === 'Processing' && (
+        {(order.status === 'CONFIRMED' || order.status === 'Processing') && (
           <TouchableOpacity
             style={[styles.primaryBtn, updating && styles.btnDisabled]}
-            onPress={shipPress}
+            onPress={readyForDeliveryPress}
             disabled={updating}
           >
-            <Text style={styles.primaryBtnText}>Mark as shipped</Text>
+            <Text style={styles.primaryBtnText}>Mark as ready for delivery</Text>
           </TouchableOpacity>
         )}
-        {order.status === 'Shipped' && (
+        {order.status === 'READY_FOR_DELIVERY' && (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>Waiting for delivery agent assignment...</Text>
+          </View>
+        )}
+        {(order.status === 'IN_TRANSIT' || order.status === 'Shipped') && (
           <TouchableOpacity
             style={[styles.primaryBtn, updating && styles.btnDisabled]}
             onPress={deliveredPress}
@@ -304,12 +324,21 @@ const styles = StyleSheet.create({
   orderGrand: { marginTop: 10, fontSize: 13, color: '#64748b', fontWeight: '600' },
   muted: { color: '#94a3b8', fontStyle: 'italic' },
   cancelledText: { color: '#b91c1c', fontWeight: '800', fontSize: 16 },
-  actions: { marginTop: 20, gap: 12 },
+  failedText: { color: '#b91c1c', fontWeight: '800', fontSize: 16 },
+  infoBox: {
+    backgroundColor: '#dbeafe',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center'
+  },
+  infoText: { color: '#1e40af', fontWeight: '700', fontSize: 14 },
+  actions: { marginTop: 20 },
   primaryBtn: {
     backgroundColor: '#15803d',
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: 'center'
+    alignItems: 'center',
+    marginBottom: 12
   },
   btnDisabled: { opacity: 0.6 },
   primaryBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 }

@@ -90,12 +90,12 @@ exports.createOrder = async (req, res) => {
 
     const customerObjectId = req.user._id || req.user.id;
 
-    const order = await Order.create({
+const order = await Order.create({
       customerName: customerName.trim(),
       customerId: customerObjectId,
       items: normalizedItems,
       totalAmount,
-      status: 'Pending'
+      status: 'PENDING'
     });
 
     await notifyFarmersForOrder(order, {
@@ -182,12 +182,16 @@ exports.updateOrder = async (req, res) => {
         order.items = items;
         order.totalAmount = items.reduce((acc, i) => acc + Number(i.price) * Number(i.quantity), 0);
       }
-      if (status) {
-        if (status === 'Cancelled' && order.status !== 'Cancelled') {
+if (status) {
+        if ((status === 'Cancelled' || status === 'CANCELLED') && order.status !== 'CANCELLED' && order.status !== 'Cancelled') {
           await restoreDeductedStock(order);
-          order.status = 'Cancelled';
+          order.status = 'CANCELLED';
+          order.legacyStatus = 'Cancelled';
         } else {
           order.status = status;
+          if (status === 'CANCELLED') order.legacyStatus = 'Cancelled';
+          else if (status === 'CONFIRMED') order.legacyStatus = 'Processing';
+          else if (status === 'DELIVERED') order.legacyStatus = 'Delivered';
         }
       }
       await order.save();
@@ -202,15 +206,16 @@ exports.updateOrder = async (req, res) => {
       return res.status(200).json({ success: true, data: order, message: 'Order updated' });
     }
 
-    if (isCustomer && status === 'Cancelled') {
-      if (order.status !== 'Pending') {
+if (isCustomer && status === 'Cancelled') {
+      if (order.status !== 'PENDING' && order.status !== 'Pending') {
         return res.status(400).json({
           success: false,
           message: 'Only pending orders can be cancelled by the customer'
         });
       }
       await restoreDeductedStock(order);
-      order.status = 'Cancelled';
+      order.status = 'CANCELLED';
+      order.legacyStatus = 'Cancelled';
       await order.save();
       await notifyFarmersForOrder(order, {
         title: 'Order cancelled',
@@ -220,22 +225,24 @@ exports.updateOrder = async (req, res) => {
       return res.status(200).json({ success: true, data: order, message: 'Order cancelled' });
     }
 
-    if (isFarmer && status === 'Shipped' && order.status === 'Processing') {
-      order.status = 'Shipped';
+if (isFarmer && status === 'READY_FOR_DELIVERY' && order.status === 'CONFIRMED') {
+      order.status = 'READY_FOR_DELIVERY';
+      order.legacyStatus = 'Processing';
       await order.save();
       if (order.customerId) {
         await notifyUser(String(order.customerId), {
-          title: 'Order shipped',
-          body: `Your order #${String(order._id).slice(-6).toUpperCase()} has been marked as shipped.`,
+          title: 'Order ready for delivery',
+          body: `Your order #${String(order._id).slice(-6).toUpperCase()} is ready for delivery.`,
           orderId: order._id,
           type: 'order_status'
         });
       }
-      return res.status(200).json({ success: true, data: order, message: 'Order marked shipped' });
+      return res.status(200).json({ success: true, data: order, message: 'Order sent to delivery module' });
     }
 
-    if (isFarmer && status === 'Delivered' && order.status === 'Shipped') {
-      order.status = 'Delivered';
+    if (isFarmer && status === 'DELIVERED' && order.status === 'IN_TRANSIT') {
+      order.status = 'DELIVERED';
+      order.legacyStatus = 'Delivered';
       await order.save();
       if (order.customerId) {
         await notifyUser(String(order.customerId), {
@@ -567,12 +574,15 @@ exports.adminApproveOrder = async (req, res) => {
       });
     }
 
-    // If admin cancelling, restore stock
+// If admin cancelling, restore stock
     if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
       await restoreDeductedStock(order);
     }
 
     order.status = status;
+    if (status === 'CANCELLED') order.legacyStatus = 'Cancelled';
+    else if (status === 'CONFIRMED') order.legacyStatus = 'Processing';
+    else if (status === 'DELIVERED') order.legacyStatus = 'Delivered';
     if (notes) order.deliveryNotes = notes;
     await order.save();
 
@@ -628,8 +638,12 @@ exports.setOrderStatus = async (req, res) => {
       await restoreDeductedStock(order);
     }
 
-    // Update order status
+// Update order status
     order.status = status;
+    if (status === 'CANCELLED') order.legacyStatus = 'Cancelled';
+    else if (status === 'CONFIRMED') order.legacyStatus = 'Processing';
+    else if (status === 'DELIVERED') order.legacyStatus = 'Delivered';
+    else if (status === 'READY_FOR_DELIVERY' || status === 'ASSIGNED' || status === 'IN_TRANSIT') order.legacyStatus = 'Shipped';
     if (reason) {
       order.deliveryNotes = reason;
     }

@@ -77,6 +77,14 @@ export const getFarmerOrderById = async (orderId, token) => {
   return response.data;
 };
 
+// Public route for any farmer on the order
+export const getFarmerOrderPublic = async (orderId, token) => {
+  const response = await axios.get(`${API_URL}/order/${orderId}`, {
+    headers: getAuthHeaders(token)
+  });
+  return response.data;
+};
+
 export const confirmFarmerOrder = async (orderId, token) => {
   try {
     const response = await axios.post(

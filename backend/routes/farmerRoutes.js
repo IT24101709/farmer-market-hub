@@ -6,6 +6,7 @@ const {
   getPriceTrends,
   getMyOrders,
   getOrderById,
+  getFarmerOrderById,
   getPaymentHistory,
   confirmFarmerOrderLines
 } = require('../controllers/farmerController');
@@ -22,6 +23,9 @@ router.get('/price-trends/:vegetableName', protect, getPriceTrends);
 router.get('/orders', protect, farmerRole, getMyOrders);
 router.post('/orders/:id/confirm', protect, farmerRole, confirmFarmerOrderLines);
 router.get('/orders/:id', protect, farmerRole, getOrderById);
+
+// Order by ID (public route for any farmer on the order)
+router.get('/order/:id', protect, getFarmerOrderById);
 
 // Payments (Farmer)
 router.get('/payments', protect, getPaymentHistory);

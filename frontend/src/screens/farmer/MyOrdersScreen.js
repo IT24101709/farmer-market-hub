@@ -14,16 +14,28 @@ import { AuthContext } from '../../context/AuthContext';
 import { getFarmerOrders } from '../../services/farmerService';
 
 const statusColor = (status) => {
+  // Check both new UPPERCASE and legacy status names
   switch (status) {
+    case 'PENDING':
     case 'Pending':
       return '#ca8a04';
+    case 'CONFIRMED':
     case 'Processing':
       return '#2563eb';
-    case 'Shipped':
+    case 'READY_FOR_DELIVERY':
       return '#7c3aed';
+    case 'ASSIGNED':
+      return '#9333ea';
+    case 'IN_TRANSIT':
+    case 'Shipped':
+      return '#ea580c';
+    case 'DELIVERED':
     case 'Delivered':
       return '#15803d';
+    case 'CANCELLED':
     case 'Cancelled':
+      return '#b91c1c';
+    case 'FAILED_DELIVERY':
       return '#b91c1c';
     default:
       return '#64748b';

@@ -217,10 +217,13 @@ exports.getPriceTrends = async (req, res) => {
 // @route   GET /api/farmer/orders
 // @access  Private (Farmer only)
 exports.getMyOrders = async (req, res) => {
-  try {
+try {
     const farmerId = req.user.id;
-    const orders = await Order.find({ 'items.farmerId': farmerId })
-      .sort({ createdAt: -1 });
+    // Get orders that have items from this farmer, excluding cancelled
+    const orders = await Order.find({ 
+      'items.farmerId': farmerId,
+      status: { $nin: ['CANCELLED', 'Cancelled'] }
+    }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -231,6 +234,25 @@ exports.getMyOrders = async (req, res) => {
 // @route   GET /api/farmer/orders/:id
 // @access  Private (Farmer only)
 exports.getOrderById = async (req, res) => {
+  try {
+    const farmerId = req.user.id || req.user._id;
+    const order = await Order.findOne({
+      _id: req.params.id,
+      'items.farmerId': farmerId
+    });
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get order by ID (public route from any farmer on the order)
+// @route   GET /api/farmer/order/:id
+// @access  Private (any farmer on the order)
+exports.getFarmerOrderById = async (req, res) => {
   try {
     const farmerId = req.user.id || req.user._id;
     const order = await Order.findOne({
@@ -296,10 +318,11 @@ exports.confirmFarmerOrderLines = async (req, res) => {
       line.farmerConfirmedAt = new Date();
     }
 
-    order.markModified('items');
+order.markModified('items');
     const allDone = order.items.every((item) => item.farmerConfirmed);
     if (allDone) {
-      order.status = 'Processing';
+      order.status = 'CONFIRMED';
+      order.legacyStatus = 'Processing';
     }
     await order.save();
 
@@ -328,11 +351,11 @@ exports.confirmFarmerOrderLines = async (req, res) => {
 // @route   GET /api/farmer/payments
 // @access  Private (Farmer only)
 exports.getPaymentHistory = async (req, res) => {
-  try {
+try {
     // Get all completed orders for this farmer as payments
     const payments = await Order.find({ 
       'items.farmerId': req.user.id,
-      status: 'Delivered'
+      $or: [{ status: 'DELIVERED' }, { legacyStatus: 'Delivered' }, { status: 'Delivered' }]
     }).sort({ updatedAt: -1 });
     
     const formatted = payments.map(order => ({
