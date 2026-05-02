@@ -31,6 +31,8 @@ import LandingScreen from '../screens/public/LandingScreen';
 import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
 import AdminOrderDetailScreen from '../screens/admin/AdminOrderDetailScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import DeliveryDashboardScreen from '../screens/delivery/DeliveryDashboardScreen';
+import DeliveryHistoryScreen from '../screens/delivery/DeliveryHistoryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -76,6 +78,21 @@ const AdminStack = () => (
   </Stack.Navigator>
 );
 
+const DeliveryAgentStack = () => (
+  <Stack.Navigator
+    initialRouteName="DeliveryDashboard"
+    screenOptions={{
+      headerStyle: { backgroundColor: '#7c3aed' },
+      headerTintColor: '#fff',
+      headerTitleStyle: { fontWeight: 'bold' }
+    }}
+  >
+    <Stack.Screen name="DeliveryDashboard" component={DeliveryDashboardScreen} options={{ title: 'My Deliveries' }} />
+    <Stack.Screen name="DeliveryHistory" component={DeliveryHistoryScreen} options={{ title: 'History' }} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+  </Stack.Navigator>
+);
+
 const CustomerStack = () => (
   <Stack.Navigator
     initialRouteName="Marketplace"
@@ -113,7 +130,7 @@ const MainNavigation = () => {
     );
   }
 
-  // Remount the tree when auth/role changes so the correct stack shows (avoids getting stuck on Login after a successful sign-in).
+// Remount the tree when auth/role changes so the correct stack shows (avoids getting stuck on Login after a successful sign-in).
   const navKey = user
     ? `app-${normalizedRole || 'unknown'}-${user._id || user.id || 'u'}`
     : 'auth';
@@ -124,6 +141,7 @@ const MainNavigation = () => {
         normalizedRole === 'admin' ? <AdminStack /> :
         normalizedRole === 'farmer' ? <FarmerStack /> :
         normalizedRole === 'customer' ? <CustomerStack /> :
+        normalizedRole === 'deliveryagent' ? <DeliveryAgentStack /> :
         <AuthStack />
       ) : (
         <AuthStack />

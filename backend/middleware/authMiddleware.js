@@ -51,4 +51,11 @@ const customerRole = (req, res, next) => {
   return res.status(403).json({ message: 'Access denied. Customer role required.' });
 };
 
-module.exports = { protect, adminRole, farmerRole, customerRole };
+const deliveryAgentRole = (req, res, next) => {
+  if (req.user && req.user.role === 'DeliveryAgent') {
+    return next();
+  }
+  return res.status(403).json({ message: 'Access denied. Delivery Agent role required.' });
+};
+
+module.exports = { protect, adminRole, farmerRole, customerRole, deliveryRole: deliveryAgentRole, deliveryAgentRole };

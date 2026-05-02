@@ -51,15 +51,19 @@ const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const deliveryRoutes = require('./routes/deliveryRoutes');
+const adminDeliveryRoutes = require('./routes/adminDeliveryRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stocks', stockRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/farmer', farmerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminDeliveryRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/deliveries', deliveryRoutes);
 
 // =======================
 // Global Error Handler (NFR-03)

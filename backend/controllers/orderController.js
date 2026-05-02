@@ -295,3 +295,363 @@ exports.getAllOrdersAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Step 2: Farmer confirms order (stock validated) -> CONFIRMED
+// @route   PUT /api/orders/:id/confirm
+// @access  Private Farmer
+exports.confirmOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const userId = uid(req.user);
+    const isFarmer = (order.items || []).some((i) => String(i.farmerId) === userId);
+    if (!isFarmer && req.user.role !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Only farmers on this order can confirm' });
+    }
+
+    if (order.status !== 'PENDING') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot confirm order in ${order.status} status`
+      });
+    }
+
+    // Deduct stock for this farmer's items
+    for (const line of order.items) {
+      if (String(line.farmerId) === userId && !line.stockDeducted) {
+        const stock = await Stock.findById(line.stockId);
+        if (stock && stock.quantity >= line.quantity) {
+          await Stock.findByIdAndUpdate(line.stockId, { $inc: { quantity: -line.quantity } });
+          line.stockDeducted = true;
+          line.farmerConfirmed = true;
+          line.farmerConfirmedAt = new Date();
+        }
+      }
+    }
+    order.markModified('items');
+
+    // Check if all items confirmed -> then move to CONFIRMED
+    const allConfirmed = order.items.every((i) => i.farmerConfirmed);
+    if (allConfirmed) {
+      order.status = 'CONFIRMED';
+      order.legacyStatus = 'Processing';
+    }
+
+    await order.save();
+
+    if (order.customerId) {
+      await notifyUser(String(order.customerId), {
+        title: 'Order confirmed',
+        body: `Order #${String(order._id).slice(-6).toUpperCase()} is confirmed by farmers.`,
+        orderId: order._id,
+        type: 'order_status'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: allConfirmed ? 'Order confirmed and ready for delivery' : 'Items confirmed'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Step 3: Send to Delivery Module (READY_FOR_DELIVERY)
+// @route   PUT /api/orders/:id/send-to-delivery
+// @access  Private Admin
+exports.sendToDelivery = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status !== 'CONFIRMED') {
+      return res.status(400).json({
+        success: false,
+        message: `Order must be CONFIRMED before sending to delivery. Current: ${order.status}`
+      });
+    }
+
+    order.status = 'READY_FOR_DELIVERY';
+    order.legacyStatus = 'Processing';
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: 'Order sent to delivery module'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Step 4: Assign delivery agent (ASSIGNED)
+// @route   PUT /api/orders/:id/assign-agent
+// @access  Private Admin
+exports.assignAgent = async (req, res) => {
+  try {
+    const { agentId } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status !== 'READY_FOR_DELIVERY') {
+      return res.status(400).json({
+        success: false,
+        message: `Order must be READY_FOR_DELIVERY. Current: ${order.status}`
+      });
+    }
+
+    order.deliveryAgentId = agentId;
+    order.deliveryAssignedAt = new Date();
+    order.status = 'ASSIGNED';
+    order.legacyStatus = 'Processing';
+    await order.save();
+
+    // Notify delivery agent
+    if (agentId) {
+      await notifyUser(String(agentId), {
+        title: 'New delivery assigned',
+        body: `Order #${String(order._id).slice(-6).toUpperCase()} assigned to you for delivery.`,
+        orderId: order._id,
+        type: 'delivery_assigned'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: 'Delivery agent assigned'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Step 5: Start delivery (IN_TRANSIT)
+// @route   PUT /api/orders/:id/start-delivery
+// @access  Private Delivery Agent
+exports.startDelivery = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const userId = uid(req.user);
+    if (String(order.deliveryAgentId) !== userId && req.user.role !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Not assigned to this order' });
+    }
+
+    if (order.status !== 'ASSIGNED') {
+      return res.status(400).json({
+        success: false,
+        message: `Order must be ASSIGNED. Current: ${order.status}`
+      });
+    }
+
+    order.status = 'IN_TRANSIT';
+    order.legacyStatus = 'Shipped';
+    await order.save();
+
+    if (order.customerId) {
+      await notifyUser(String(order.customerId), {
+        title: 'Delivery started',
+        body: `Your order #${String(order._id).slice(-6).toUpperCase()} is on the way!`,
+        orderId: order._id,
+        type: 'order_status'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: 'Delivery started'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Step 6: Complete delivery (DELIVERED)
+// @route   PUT /api/orders/:id/complete-delivery
+// @access  Private Delivery Agent
+exports.completeDelivery = async (req, res) => {
+  try {
+    const { notes } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const userId = uid(req.user);
+    if (String(order.deliveryAgentId) !== userId && req.user.role !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Not assigned to this order' });
+    }
+
+    if (order.status !== 'IN_TRANSIT') {
+      return res.status(400).json({
+        success: false,
+        message: `Order must be IN_TRANSIT. Current: ${order.status}`
+      });
+    }
+
+    order.status = 'DELIVERED';
+    order.legacyStatus = 'Delivered';
+    order.deliveredAt = new Date();
+    if (notes) order.deliveryNotes = notes;
+    await order.save();
+
+    if (order.customerId) {
+      await notifyUser(String(order.customerId), {
+        title: 'Order delivered',
+        body: `Your order #${String(order._id).slice(-6).toUpperCase()} has been delivered. Thank you!`,
+        orderId: order._id,
+        type: 'order_status'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: 'Delivery completed'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get orders ready for delivery (READY_FOR_DELIVERY or ASSIGNED)
+// @route   GET /api/admin/shipments/pending
+// @access  Private Admin
+exports.getPendingShipments = async (req, res) => {
+  try {
+    const orders = await Order.find({
+      status: { $in: ['READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT'] }
+    }).sort({ createdAt: -1 }).limit(100);
+
+    res.status(200).json({ success: true, count: orders.length, data: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Admin: Approve or Reject order (force change status)
+// @route   PUT /api/orders/:id/admin-approve
+// @access  Private Admin
+exports.adminApproveOrder = async (req, res) => {
+  try {
+    const { status, notes } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Validate admin's choice
+    const validStatuses = [
+      'PENDING', 'CONFIRMED', 'CANCELLED', 'READY_FOR_DELIVERY',
+      'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'FAILED_DELIVERY'
+    ];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Admin can force any status.'
+      });
+    }
+
+    // If admin cancelling, restore stock
+    if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+      await restoreDeductedStock(order);
+    }
+
+    order.status = status;
+    if (notes) order.deliveryNotes = notes;
+    await order.save();
+
+    // Notify customer
+    if (order.customerId) {
+      await notifyUser(String(order.customerId), {
+        title: 'Order updated by admin',
+        body: `Order #${String(order._id).slice(-6).toUpperCase()} status is now ${status}.`,
+        orderId: order._id,
+        type: 'order_status'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: `Order updated to ${status} by admin`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Admin: Set order status directly
+// @route   PUT /api/orders/:id/set-status
+// @access  Private Admin
+exports.setOrderStatus = async (req, res) => {
+  try {
+    const { status, reason } = req.body;
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const oldStatus = order.status;
+    
+    // Valid statuses for admin to set
+    const validStatuses = [
+      'PENDING', 'CONFIRMED', 'CANCELLED', 'READY_FOR_DELIVERY',
+      'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'FAILED_DELIVERY'
+    ];
+
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Valid: ${validStatuses.join(', ')}`
+      });
+    }
+
+    // If setting to CANCELLED, restore stock
+    if (status === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+      await restoreDeductedStock(order);
+    }
+
+    // Update order status
+    order.status = status;
+    if (reason) {
+      order.deliveryNotes = reason;
+    }
+    await order.save();
+
+    // Notify customer
+    if (order.customerId) {
+      await notifyUser(String(order.customerId), {
+        title: 'Order status changed',
+        body: `Your order #${String(order._id).slice(-6).toUpperCase()} status changed from ${oldStatus} to ${status}.`,
+        orderId: order._id,
+        type: 'order_status'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: `Order status set to ${status}`,
+      previousStatus: oldStatus
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
