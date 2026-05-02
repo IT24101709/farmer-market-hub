@@ -91,6 +91,22 @@ const AdminDashboardScreen = ({ navigation }) => {
           <Text style={styles.cardIcon}>🛒</Text>
           <Text style={styles.cardTitle}>Manage Orders</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminReviews')}>
+          <Text style={styles.cardIcon}>S5</Text>
+          <Text style={styles.cardTitle}>Reviews</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminReports')}>
+          <Text style={styles.cardIcon}>S6</Text>
+          <Text style={styles.cardTitle}>Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminDeliveries')}>
+          <Text style={styles.cardIcon}>D</Text>
+          <Text style={styles.cardTitle}>Deliveries</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminPayments')}>
+          <Text style={styles.cardIcon}>P</Text>
+          <Text style={styles.cardTitle}>Payments</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Notifications')}>
           <Text style={styles.cardIcon}>🔔</Text>
           <Text style={styles.cardTitle}>Notifications</Text>

@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -22,8 +23,13 @@ const METHODS = [
 const PaymentScreen = ({ route, navigation }) => {
   const { orderId, totalAmount, customerName } = route.params || {};
   const { token } = useContext(AuthContext);
-  const [selectedMethod, setSelectedMethod] = useState('CASH');
+  const [selectedMethod, setSelectedMethod] = useState('CARD');
   const [loading, setLoading] = useState(false);
+
+  // Card details state
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
 
   const handlePayment = async () => {
     if (!selectedMethod) {
@@ -31,6 +37,28 @@ const PaymentScreen = ({ route, navigation }) => {
       if (Platform.OS === 'web') { window.alert(msg); return; }
       Alert.alert('Select Method', msg);
       return;
+    }
+
+    if (selectedMethod === 'CARD') {
+      const cleanCard = cardNumber.replace(/\s+/g, '');
+      if (cleanCard.length !== 16 || !/^\d{16}$/.test(cleanCard)) {
+        const msg = 'Please enter a valid 16-digit card number.';
+        if (Platform.OS === 'web') { window.alert(msg); return; }
+        Alert.alert('Invalid Card', msg);
+        return;
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) {
+        const msg = 'Please enter a valid expiry date (MM/YY).';
+        if (Platform.OS === 'web') { window.alert(msg); return; }
+        Alert.alert('Invalid Expiry', msg);
+        return;
+      }
+      if (cvv.length !== 3 || !/^\d{3}$/.test(cvv)) {
+        const msg = 'Please enter a valid 3-digit CVV.';
+        if (Platform.OS === 'web') { window.alert(msg); return; }
+        Alert.alert('Invalid CVV', msg);
+        return;
+      }
     }
 
     const confirm = () => {
@@ -48,13 +76,16 @@ const PaymentScreen = ({ route, navigation }) => {
         await processPayment({ orderId, paymentMethod: selectedMethod }, token);
         const msg = '✅ Payment processed successfully! Your order is now being handled.';
         if (Platform.OS === 'web') {
-          window.alert(msg);
-          navigation.navigate('CustomerOrderDetail', { orderId });
+          navigation.navigate('PaymentReceipt', {
+            orderId, totalAmount, paymentMethod: selectedMethod, customerName
+          });
         } else {
           Alert.alert('Payment Successful', msg, [
             {
-              text: 'View Order',
-              onPress: () => navigation.navigate('CustomerOrderDetail', { orderId })
+              text: 'View Receipt',
+              onPress: () => navigation.navigate('PaymentReceipt', {
+                orderId, totalAmount, paymentMethod: selectedMethod, customerName
+              })
             }
           ]);
         }
@@ -114,6 +145,56 @@ const PaymentScreen = ({ route, navigation }) => {
             )}
           </TouchableOpacity>
         ))}
+
+        {/* Card Form */}
+        {selectedMethod === 'CARD' && (
+          <View style={styles.cardForm}>
+            <Text style={styles.inputLabel}>Card Number</Text>
+            <TextInput
+              style={styles.inputField}
+              placeholder="XXXX XXXX XXXX XXXX"
+              keyboardType="numeric"
+              maxLength={19}
+              value={cardNumber}
+              onChangeText={(text) => {
+                // Auto format with spaces
+                const numeric = text.replace(/\D/g, '');
+                let formatted = numeric.match(/.{1,4}/g)?.join(' ') || numeric;
+                setCardNumber(formatted);
+              }}
+            />
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <Text style={styles.inputLabel}>Expiry (MM/YY)</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="MM/YY"
+                  maxLength={5}
+                  value={expiry}
+                  onChangeText={(text) => {
+                    let formatted = text.replace(/[^0-9/]/g, '');
+                    if (formatted.length === 2 && !formatted.includes('/')) {
+                      formatted += '/';
+                    }
+                    setExpiry(formatted);
+                  }}
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Text style={styles.inputLabel}>CVV</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="123"
+                  keyboardType="numeric"
+                  maxLength={3}
+                  secureTextEntry
+                  value={cvv}
+                  onChangeText={(text) => setCvv(text.replace(/\D/g, ''))}
+                />
+              </View>
+            </View>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.payBtn, loading && styles.payBtnDisabled]}
@@ -221,7 +302,40 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#93c5fd'
   },
-  noteText: { color: '#1e3a5f', fontSize: 13, lineHeight: 20 }
+  noteText: { color: '#1e3a5f', fontSize: 13, lineHeight: 20 },
+  cardForm: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
+    marginTop: 8
+  },
+  inputField: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1e293b'
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4
+  },
+  halfWidth: {
+    width: '48%'
+  }
 });
 
 export default PaymentScreen;

@@ -44,9 +44,13 @@ import AgentDeliveriesScreen from '../screens/delivery/AgentDeliveriesScreen';
 import AgentDeliveryDetailScreen from '../screens/delivery/AgentDeliveryDetailScreen';
 // Payment module screens
 import PaymentScreen from '../screens/customer/PaymentScreen';
+import PaymentReceiptScreen from '../screens/customer/PaymentReceiptScreen';
 import CustomerPaymentHistoryScreen from '../screens/customer/CustomerPaymentHistoryScreen';
 import AdminPaymentScreen from '../screens/admin/AdminPaymentScreen';
 import PaymentDetailScreen from '../screens/admin/PaymentDetailScreen';
+import AdminReviewsScreen from '../screens/admin/AdminReviewsScreen';
+import AdminReportsScreen from '../screens/admin/AdminReportsScreen';
+import ReviewsScreen from '../screens/reviews/ReviewsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -68,6 +72,7 @@ const FarmerStack = () => (
     <Stack.Screen name="BulkOperations" component={BulkOperationsScreen} options={{ title: 'Bulk Operations' }} />
     <Stack.Screen name="MyOrders" component={MyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ title: 'Order Details' }} />
+    <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Reviews' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Payments' }} />
   </Stack.Navigator>
@@ -92,6 +97,9 @@ const AdminStack = () => (
     <Stack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} options={{ title: 'Delivery Details' }} />
     <Stack.Screen name="AdminPayments" component={AdminPaymentScreen} options={{ title: 'Payments' }} />
     <Stack.Screen name="PaymentDetail" component={PaymentDetailScreen} options={{ title: 'Payment Detail' }} />
+    <Stack.Screen name="AdminReviews" component={AdminReviewsScreen} options={{ title: 'Reviews' }} />
+    <Stack.Screen name="AdminReports" component={AdminReportsScreen} options={{ title: 'Reports' }} />
+    <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Reviews' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
   </Stack.Navigator>
 );
@@ -127,9 +135,11 @@ const CustomerStack = () => (
     <Stack.Screen name="CustomerOrders" component={CustomerOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="CustomerOrderDetail" component={CustomerOrderDetailScreen} options={{ title: 'Order' }} />
     <Stack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} options={{ title: 'Track Delivery' }} />
+    <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Reviews' }} />
     <Stack.Screen name="PlaceOrder" component={PlaceOrderScreen} options={{ title: 'Place Order' }} />
     <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
+    <Stack.Screen name="PaymentReceipt" component={PaymentReceiptScreen} options={{ title: 'Receipt', headerShown: false }} />
     <Stack.Screen name="PaymentDetail" component={PaymentDetailScreen} options={{ title: 'Payment Detail' }} />
     <Stack.Screen name="PaymentHistory" component={CustomerPaymentHistoryScreen} options={{ title: 'Payment History' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />

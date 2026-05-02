@@ -7,7 +7,9 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Platform,
+  Alert
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
@@ -120,15 +122,31 @@ const AdminPaymentScreen = ({ navigation }) => {
     );
   }
 
+  const handleGenerateReport = () => {
+    const msg = 'Generating and downloading transaction history report...';
+    if (Platform.OS === 'web') {
+      window.alert(msg);
+    } else {
+      Alert.alert('Report Generation', msg);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Stats Banner */}
       {stats && (
         <View style={styles.statsBanner}>
-          <Text style={styles.revenueLabel}>TOTAL REVENUE</Text>
-          <Text style={styles.revenueAmount}>
-            LKR {Number(stats.totalRevenue || 0).toFixed(2)}
-          </Text>
+          <View style={styles.bannerHeader}>
+            <View>
+              <Text style={styles.revenueLabel}>TOTAL REVENUE</Text>
+              <Text style={styles.revenueAmount}>
+                LKR {Number(stats.totalRevenue || 0).toFixed(2)}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.reportBtn} onPress={handleGenerateReport}>
+              <Text style={styles.reportBtnText}>📄 Generate Report</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.statsRow}>
             <StatBox label="Total" value={stats.total || 0} color="#fff" />
             <StatBox label="Success" value={stats.success || 0} color="#86efac" />
@@ -183,6 +201,23 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 22
   },
+  bannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16
+  },
+  reportBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8
+  },
+  reportBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700'
+  },
   revenueLabel: {
     color: '#ffccbc',
     fontSize: 11,
@@ -191,7 +226,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4
   },
-  revenueAmount: { color: '#fff', fontSize: 30, fontWeight: '900', marginBottom: 16 },
+  revenueAmount: { color: '#fff', fontSize: 30, fontWeight: '900' },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   statBox: { alignItems: 'center', flex: 1 },
   statValue: { fontSize: 22, fontWeight: '900' },

@@ -94,22 +94,8 @@ exports.getReviewSummary = async (req, res) => {
     if (stockId) filter.stockId = stockId;
     if (farmerId) filter.farmerId = farmerId;
 
-    const result = await Review.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: null,
-          averageRating: { $avg: '$rating' },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const summary = result[0]
-      ? { count: result[0].count, averageRating: Number(result[0].averageRating.toFixed(2)) }
-      : { count: 0, averageRating: 0 };
-
-    res.status(200).json({ success: true, data: summary });
+    const reviews = await Review.find(filter).select('rating');
+    res.status(200).json({ success: true, data: summaryFrom(reviews) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

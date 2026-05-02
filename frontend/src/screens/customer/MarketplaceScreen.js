@@ -153,6 +153,17 @@ const MarketplaceScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.buyButton} onPress={() => addToCart(item)}>
             <Text style={styles.buyButtonText}>Add to Cart</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.reviewButton}
+            onPress={() => navigation.navigate('Reviews', {
+              stockId: item._id,
+              farmerId: item.farmerId?._id || item.farmerId,
+              stockName: title,
+              farmerName
+            })}
+          >
+            <Text style={styles.reviewButtonText}>Reviews & Rating</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -508,6 +519,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  reviewButton: {
+    marginTop: 10,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    paddingVertical: 11,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BBDEFB'
+  },
+  reviewButtonText: {
+    color: '#1976D2',
+    fontWeight: 'bold',
+    fontSize: 14
   },
   centered: {
     flex: 1,

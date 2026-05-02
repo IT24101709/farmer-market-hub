@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { label: 'Add Stock', screen: 'AddStock' },
   { label: 'View Stock', screen: 'StockList' },
   { label: 'Orders', screen: 'MyOrders' },
+  { label: 'Reviews', screen: 'Reviews' },
   { label: 'Alerts', screen: 'Notifications' },
   { label: 'Profile', screen: 'FarmerProfile' }
 ];
@@ -94,6 +95,13 @@ const FarmerDashboardScreen = ({ navigation }) => {
 
   const handleNavigation = (item) => {
     if (item.screen !== 'FarmerDashboard') {
+      if (item.screen === 'Reviews') {
+        navigation.navigate('Reviews', {
+          farmerId: user?._id || user?.id,
+          farmerName: user?.name || 'My Farm'
+        });
+        return;
+      }
       navigation.navigate(item.screen);
     }
   };

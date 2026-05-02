@@ -63,3 +63,16 @@ export const getReportExportUrl = (type, format, month) => {
   });
   return `${API_URL}/export?${query.toString()}`;
 };
+
+export const exportReportData = async (token, type, format, month) => {
+  try {
+    const response = await axios.get(`${API_URL}/export`, {
+      params: { type, format, month },
+      headers: authHeaders(token),
+      responseType: format === 'pdf' ? 'arraybuffer' : 'json'
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to export report');
+  }
+};
