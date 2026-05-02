@@ -55,6 +55,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const adminDeliveryRoutes = require('./routes/adminDeliveryRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stocks', stockRoutes);
@@ -67,6 +69,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/reports', reportRoutes);
 
 // =======================
 // Global Error Handler (NFR-03)
