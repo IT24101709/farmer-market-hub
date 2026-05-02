@@ -19,7 +19,7 @@ const marketplaceFilter = () => {
 // @access  Private (Customer, Farmer, Admin)
 exports.getProducts = async (req, res) => {
   try {
-    const { search, minPrice, maxPrice, farmerId, category, page = 1, limit = 20 } = req.query;
+    const { search, minPrice, maxPrice, farmerId, category, page = 1, limit = 20, sort = 'newest' } = req.query;
 
     const filter = marketplaceFilter();
 
@@ -46,11 +46,20 @@ exports.getProducts = async (req, res) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
+    const sortMap = {
+      newest: { createdAt: -1 },
+      name: { name: 1, createdAt: -1 },
+      priceAsc: { pricePerKg: 1, createdAt: -1 },
+      priceDesc: { pricePerKg: -1, createdAt: -1 },
+      qtyDesc: { quantity: -1, createdAt: -1 }
+    };
+    const sortSpec = sortMap[String(sort)] || sortMap.newest;
+
     const [products, total] = await Promise.all([
       Stock.find(filter)
         .populate('farmerId', 'name email profileDetails')
         .populate('categoryId', 'name')
-        .sort({ createdAt: -1 })
+        .sort(sortSpec)
         .skip(skip)
         .limit(Number(limit))
         .lean(),

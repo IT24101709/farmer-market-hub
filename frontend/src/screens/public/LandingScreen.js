@@ -11,17 +11,11 @@ import {
   Dimensions
 } from 'react-native';
 import { getPublicProducts } from '../../services/publicService';
-import getEnvVars from '../../config';
+import { resolveStockImageUrl } from '../../config';
 
 const { width } = Dimensions.get('window');
-const { apiUrl } = getEnvVars();
-const API_BASE = apiUrl.replace('/api', '');
 
-const previewImageUrl = (product) => {
-  const path = product.imageUrl || product.image;
-  if (!path) return null;
-  return String(path).startsWith('http') ? path : `${API_BASE}${path}`;
-};
+const previewImageUrl = (product) => resolveStockImageUrl(product);
 
 const LandingScreen = ({ navigation }) => {
   const [products, setProducts] = useState([]);

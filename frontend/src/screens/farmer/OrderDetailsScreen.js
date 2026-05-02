@@ -63,6 +63,8 @@ const load = async () => {
 
   const myItems = order?.items?.filter((i) => String(i.farmerId) === String(farmerId)) || [];
   const mySubtotal = myItems.reduce((s, i) => s + Number(i.price) * Number(i.quantity), 0);
+  const myLinesFullyConfirmed =
+    myItems.length > 0 && myItems.every((l) => Boolean(l.farmerConfirmed));
 
   const updateStatus = async (nextStatus) => {
     if (!token || !order?._id) return;
@@ -150,7 +152,20 @@ const load = async () => {
   ];
 const statusOrder = ['PENDING', 'CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED'];
   const displayStatus = order.status || order.legacyStatus || 'PENDING';
-  const currentIdx = statusOrder.indexOf(displayStatus);
+  let trackingStatusKey = typeof displayStatus === 'string' ? displayStatus : 'PENDING';
+  if (!statusOrder.includes(trackingStatusKey)) {
+    if (displayStatus === 'Processing' || order.legacyStatus === 'Processing') {
+      trackingStatusKey = 'CONFIRMED';
+    } else if (displayStatus === 'Pending' || displayStatus === 'PENDING') {
+      trackingStatusKey = 'PENDING';
+    } else {
+      trackingStatusKey = 'PENDING';
+    }
+  }
+  if (trackingStatusKey === 'PENDING' && myLinesFullyConfirmed) {
+    trackingStatusKey = 'CONFIRMED';
+  }
+  const currentIdx = statusOrder.indexOf(trackingStatusKey);
   const isCancelled = order.status === 'CANCELLED' || order.status === 'Cancelled';
   const isFailed = order.status === 'FAILED_DELIVERY';
 
@@ -162,14 +177,21 @@ const statusOrder = ['PENDING', 'CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', '
 <View style={styles.section}>
         <Text style={styles.sectionTitle}>Status</Text>
         <Text style={styles.statusBig}>
-          {displayStatus === 'CONFIRMED' || displayStatus === 'Processing' ? 'Confirmed by farmer' :
+          {(displayStatus === 'CONFIRMED' || displayStatus === 'Processing') ? 'Confirmed by farmer' :
+           (displayStatus === 'PENDING' || displayStatus === 'Pending') && myLinesFullyConfirmed ? 'Confirmed by farmer' :
            displayStatus === 'READY_FOR_DELIVERY' ? 'Ready for delivery' :
            displayStatus === 'ASSIGNED' ? 'Agent assigned' :
            displayStatus === 'IN_TRANSIT' || displayStatus === 'Shipped' ? 'In transit' :
            displayStatus === 'DELIVERED' || displayStatus === 'Delivered' ? 'Delivered' :
            displayStatus === 'CANCELLED' || displayStatus === 'Cancelled' ? 'Cancelled' :
-           displayStatus === 'PENDING' || displayStatus === 'Pending' ? 'Pending' : order.status}
+           displayStatus === 'PENDING' || displayStatus === 'Pending' ? 'Order placed' : order.status}
         </Text>
+        {(displayStatus === 'PENDING' || displayStatus === 'Pending') && myLinesFullyConfirmed && (
+          <Text style={styles.metaMuted}>
+            Your produce is confirmed. If other farms supply this order, the overall status may stay active until everyone
+            confirms.
+          </Text>
+        )}
         <Text style={styles.meta}>Placed: {formatDate(order.createdAt)}</Text>
         {order.updatedAt && order.updatedAt !== order.createdAt && (
           <Text style={styles.meta}>Last update: {formatDate(order.updatedAt)}</Text>
@@ -185,8 +207,9 @@ const statusOrder = ['PENDING', 'CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', '
         ) : (
           trackingSteps.map((step) => {
             const stepIdx = statusOrder.indexOf(step.key);
-            const done = currentIdx >= stepIdx && stepIdx >= 0;
-            const current = order.status === step.key;
+            const idx = currentIdx >= 0 ? currentIdx : 0;
+            const done = idx >= stepIdx && stepIdx >= 0;
+            const current = trackingStatusKey === step.key;
             return (
               <View key={step.key} style={styles.trackRow}>
                 <View style={[styles.trackDot, done && styles.trackDotDone, current && styles.trackDotCurrent]} />
@@ -287,6 +310,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: 8 },
   statusBig: { fontSize: 22, fontWeight: '900', color: '#15803d' },
   meta: { marginTop: 6, color: '#475569', fontWeight: '600' },
+  metaMuted: { marginTop: 8, color: '#64748b', fontWeight: '600', fontSize: 13, lineHeight: 18 },
   trackRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   trackDot: {
     width: 12,

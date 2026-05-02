@@ -16,10 +16,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { CartContext } from '../../context/CartContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import { getMarketProducts } from '../../services/marketService';
-import getEnvVars from '../../config';
-
-const { apiUrl } = getEnvVars();
-const API_BASE = apiUrl.replace('/api', '');
+import { resolveStockImageUrl } from '../../config';
 
 const CATEGORY_CHIPS = [
   { label: 'All', value: '' },
@@ -33,11 +30,7 @@ const CATEGORY_CHIPS = [
   { label: 'Other', value: 'other' }
 ];
 
-const imageUrlForProduct = (item) => {
-  const path = item.imageUrl || item.image;
-  if (!path) return null;
-  return String(path).startsWith('http') ? path : `${API_BASE}${path}`;
-};
+const imageUrlForProduct = (item) => resolveStockImageUrl(item);
 
 const MarketplaceScreen = ({ navigation }) => {
   const { token, logout } = useContext(AuthContext);

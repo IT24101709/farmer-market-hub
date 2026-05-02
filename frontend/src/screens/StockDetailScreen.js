@@ -12,15 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { getStockById, deleteStock } from '../services/stockService';
 import { AuthContext } from '../context/AuthContext';
-import getEnvVars from '../config';
-
-const { apiUrl } = getEnvVars();
-const API_BASE = apiUrl.replace('/api', '');
-
-const imageUrlFor = (path) => {
-  if (!path) return null;
-  return path.startsWith('http') ? path : `${API_BASE}${path}`;
-};
+import { resolveStockImageUrl } from '../config';
 
 const riskColors = {
   critical: { bg: '#fee2e2', fg: '#991b1b' },
@@ -31,7 +23,7 @@ const riskColors = {
 
 const StockDetailScreen = ({ route, navigation }) => {
   const { token, logout } = React.useContext(AuthContext);
-  const { stockId } = route.params;
+  const { stockId: routeStockId } = route.params;
   const [stock, setStock] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -43,7 +35,11 @@ const StockDetailScreen = ({ route, navigation }) => {
       return;
     }
     try {
-      const data = await getStockById(stockId, token);
+      const idToLoad = routeStockId || route.params?.stock?._id;
+      if (!idToLoad) {
+        throw new Error('Missing stock id');
+      }
+      const data = await getStockById(idToLoad, token);
       setStock(data);
     } catch (error) {
       console.error(error);
@@ -53,7 +49,7 @@ const StockDetailScreen = ({ route, navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [stockId, token, logout, navigation]);
+  }, [routeStockId, route.params, token, logout, navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -74,9 +70,11 @@ const StockDetailScreen = ({ route, navigation }) => {
           onPress: async () => {
             try {
               setDeleting(true);
-              await deleteStock(stockId, token);
+              const idToDelete = routeStockId || stock?._id;
+              if (!idToDelete) throw new Error('Missing stock id');
+              await deleteStock(idToDelete, token);
               Alert.alert('Success', 'Stock removed successfully.');
-              navigation.navigate('StockList');
+              navigation.replace('StockList');
             } catch (error) {
               if (error.status === 401) logout();
               Alert.alert('Error', error.message || 'Failed to delete stock.');
@@ -100,8 +98,7 @@ const StockDetailScreen = ({ route, navigation }) => {
   if (!stock) return null;
 
   const isAvailable = stock.status === 'Available';
-  const imagePath = stock.imageUrl || stock.image;
-  const imageUrl = imageUrlFor(imagePath);
+  const imageUrl = resolveStockImageUrl(stock);
 
   const displayName = stock.name || stock.vegetableName || 'Stock';
   const riskLevel = String(stock.spoilageRiskLevel || 'low').toLowerCase();
@@ -178,7 +175,12 @@ const StockDetailScreen = ({ route, navigation }) => {
         <View style={styles.actionContainer}>
           <TouchableOpacity
             style={[styles.button, styles.editButton]}
-            onPress={() => navigation.navigate('EditStock', { stock, stockId: stock._id })}
+            onPress={() =>
+              navigation.navigate('EditStock', {
+                stock,
+                stockId: routeStockId || stock?._id
+              })
+            }
           >
             <Text style={styles.editButtonText}>Edit details</Text>
           </TouchableOpacity>

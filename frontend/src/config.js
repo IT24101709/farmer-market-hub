@@ -59,4 +59,45 @@ const getEnvVars = () => {
   return { apiUrl: PROD_API };
 };
 
+/** Origin for uploads and other static paths from the API (same base as axios, minus `/api`). */
+export function assetOriginFromEnv() {
+  const { apiUrl } = getEnvVars();
+  return trimSlash(apiUrl).replace(/\/api$/i, '');
+}
+
+/** Turns `/uploads/...` into a loadable absolute URL matching the configured API host. */
+export function resolveUploadUrl(pathOrUrl) {
+  if (pathOrUrl == null || pathOrUrl === '') return null;
+  let raw = String(pathOrUrl).trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  raw = raw.replace(/\\/g, '/');
+  const path = raw.startsWith('/') ? raw : `/${raw}`;
+  const origin = assetOriginFromEnv();
+  return `${origin}${path}`;
+}
+
+/** First non-empty image field from stock/product records (handles legacy Mongoose naming). */
+export function pickStockMediaPath(record) {
+  if (!record || typeof record !== 'object') return null;
+  const candidates = [
+    record.imageUrl,
+    record.image,
+    record.photo,
+    record.photoUrl,
+    record.thumbnail,
+    record.thumbnailUrl,
+    record.vegetableImage,
+    record.coverImage
+  ];
+  for (const c of candidates) {
+    if (c != null && String(c).trim() !== '') return c;
+  }
+  return null;
+}
+
+export function resolveStockImageUrl(record) {
+  return resolveUploadUrl(pickStockMediaPath(record));
+}
+
 export default getEnvVars;

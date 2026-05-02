@@ -195,8 +195,8 @@ stockSchema.post('save', function(doc) {
 // INDEXES (Performance - NFR-02)
 // =======================
 
-// Compound unique index to prevent duplicates (farmer + name + harvestDate)
-stockSchema.index({ farmerId: 1, name: 1, harvestDate: 1 }, { unique: true });
+// Non-unique index for farmer stock listing (many rows allowed with same name + harvest date — each has its own stock _id).
+stockSchema.index({ farmerId: 1, createdAt: -1 });
 
 // Performance indexes for marketplace queries
 stockSchema.index({ farmerId: 1, availabilityStatus: 1 });

@@ -84,6 +84,15 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Customer-provided delivery address and note
+  deliveryAddress: {
+    type: String,
+    default: ''
+  },
+  note: {
+    type: String,
+    default: ''
+  },
   // Legacy status mapping for backward compatibility
   legacyStatus: {
     type: String,

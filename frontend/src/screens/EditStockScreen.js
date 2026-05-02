@@ -14,21 +14,40 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
-import getEnvVars from '../config';
+import { resolveStockImageUrl } from '../config';
 import {
   getStockById,
-  updateStockAvailability,
-  updateStockPrice,
-  updateStockQuantity,
   updateStock
 } from '../services/stockService';
 
-const { apiUrl } = getEnvVars();
-const API_BASE = apiUrl.replace('/api', '');
+/** Browsers must send Blob/File — native uses { uri, name, type }. */
+const appendStockImageToFormData = async (formData, image) => {
+  const localUri = image.uri;
+  const rawName = localUri.split('/').pop()?.split('?')[0] || '';
+  const filename =
+    localUri.startsWith('blob:') || !rawName ? `stock-${Date.now()}.jpg` : rawName;
+  const match = /\.(\w+)$/.exec(filename);
 
-const imageUrlFor = (image) => {
-  if (!image) return null;
-  return image.startsWith('http') ? image : `${API_BASE}${image}`;
+  if (Platform.OS === 'web') {
+    const picked = image.file;
+    if (picked instanceof Blob) {
+      formData.append('image', picked, filename);
+      return;
+    }
+    const res = await fetch(localUri);
+    const blob = await res.blob();
+    const outName =
+      blob.type === 'image/png' ? `stock-${Date.now()}.png` : `stock-${Date.now()}.jpg`;
+    formData.append('image', blob, outName);
+    return;
+  }
+
+  const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
+  formData.append('image', {
+    uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
+    name: filename,
+    type
+  });
 };
 
 const EditStockScreen = ({ route, navigation }) => {
@@ -71,7 +90,10 @@ const EditStockScreen = ({ route, navigation }) => {
     }
   }, [stockId, token]);
 
-  const imageUri = useMemo(() => newImage?.uri || imageUrlFor(stock?.image), [stock, newImage]);
+  const imageUri = useMemo(
+    () => newImage?.uri || (stock ? resolveStockImageUrl(stock) : null),
+    [stock, newImage]
+  );
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -110,6 +132,49 @@ const EditStockScreen = ({ route, navigation }) => {
   const submitChanges = async () => {
     if (!validateForm()) return;
 
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Update this stock quantity, price, and availability status?');
+      if (!confirmed) return;
+      
+      try {
+        setSaving(true);
+        const qty = Number(quantity);
+        const price = Number(pricePerKg);
+        const nextStatus = qty > 0 && availabilityStatus ? 'Available' : 'Out of Stock';
+
+        let payload = {
+          quantity: qty,
+          pricePerKg: price,
+          status: nextStatus
+        };
+
+        if (newImage) {
+          const formData = new FormData();
+          formData.append('quantity', String(qty));
+          formData.append('pricePerKg', String(price));
+          formData.append('status', nextStatus);
+          await appendStockImageToFormData(formData, newImage);
+          payload = formData;
+        }
+
+        const idToUpdate = stockId || stock?._id;
+        if (!idToUpdate) {
+          window.alert('Error: Missing stock id. Go back and open this listing again.');
+          return;
+        }
+        await updateStock(idToUpdate, payload, token);
+
+        window.alert('Stock updated successfully.');
+        navigation.navigate('StockList');
+      } catch (error) {
+        if (error.status === 401) logout();
+        window.alert('Error: ' + (error.message || 'Failed to update stock.'));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     Alert.alert(
       'Confirm Update',
       'Update this stock quantity, price, and availability status?',
@@ -122,35 +187,29 @@ const EditStockScreen = ({ route, navigation }) => {
               setSaving(true);
               const qty = Number(quantity);
               const price = Number(pricePerKg);
+              const nextStatus = qty > 0 && availabilityStatus ? 'Available' : 'Out of Stock';
 
-              if (qty !== Number(stock.quantity)) {
-                await updateStockQuantity(stock._id, qty, token);
-              }
-
-              if (price !== Number(stock.pricePerKg)) {
-                await updateStockPrice(stock._id, price, token);
-              }
-
-              const currentAvailability = stock.availabilityStatus === true || stock.status === 'Available';
-              if (availabilityStatus !== currentAvailability || qty === 0) {
-                await updateStockAvailability(stock._id, qty > 0 ? availabilityStatus : false, token);
-              }
+              let payload = {
+                quantity: qty,
+                pricePerKg: price,
+                status: nextStatus
+              };
 
               if (newImage) {
                 const formData = new FormData();
-                const localUri = newImage.uri;
-                const filename = localUri.split('/').pop() || 'stock.jpg';
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
-
-                formData.append('image', {
-                  uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
-                  name: filename,
-                  type
-                });
-
-                await updateStock(stock._id, formData, token);
+                formData.append('quantity', String(qty));
+                formData.append('pricePerKg', String(price));
+                formData.append('status', nextStatus);
+                await appendStockImageToFormData(formData, newImage);
+                payload = formData;
               }
+
+              const idToUpdate = stockId || stock?._id;
+              if (!idToUpdate) {
+                Alert.alert('Error', 'Missing stock id. Go back and open this listing again.');
+                return;
+              }
+              await updateStock(idToUpdate, payload, token);
 
               Alert.alert('Success', 'Stock updated successfully.', [
                 { text: 'OK', onPress: () => navigation.navigate('StockList') }
@@ -179,7 +238,7 @@ const EditStockScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Edit Stock</Text>
-        <Text style={styles.subtitle}>{stock.vegetableName}</Text>
+        <Text style={styles.subtitle}>{stock.name || stock.vegetableName || 'Stock item'}</Text>
 
         <TouchableOpacity style={styles.imageWrap} onPress={pickImage}>
           {imageUri ? (

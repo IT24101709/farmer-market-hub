@@ -64,6 +64,46 @@ const farmerSubtotal = (order, farmerId) => {
     .reduce((sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0), 0);
 };
 
+/** Farmer-visible label while order.status can stay PENDING until all farms confirm */
+const farmerFacingStatusSummary = (order, farmerId) => {
+  const fid = farmerId != null ? String(farmerId) : '';
+  const mine =
+    fid && Array.isArray(order?.items)
+      ? order.items.filter((i) => String(i.farmerId) === fid)
+      : [];
+  const myConfirmed =
+    mine.length > 0 && mine.every((l) => Boolean(l.farmerConfirmed));
+  const st = order?.status || 'PENDING';
+
+  switch (st) {
+    case 'CANCELLED':
+    case 'Cancelled':
+      return { label: 'Cancelled', colorKey: 'CANCELLED' };
+    case 'FAILED_DELIVERY':
+      return { label: 'Failed delivery', colorKey: 'FAILED_DELIVERY' };
+    case 'READY_FOR_DELIVERY':
+      return { label: 'Ready for delivery', colorKey: 'READY_FOR_DELIVERY' };
+    case 'ASSIGNED':
+      return { label: 'Agent assigned', colorKey: 'ASSIGNED' };
+    case 'IN_TRANSIT':
+    case 'Shipped':
+      return { label: 'In transit', colorKey: 'IN_TRANSIT' };
+    case 'DELIVERED':
+    case 'Delivered':
+      return { label: 'Delivered', colorKey: 'DELIVERED' };
+    case 'CONFIRMED':
+    case 'Processing':
+      return { label: 'Confirmed by farmer', colorKey: 'CONFIRMED' };
+    case 'PENDING':
+    case 'Pending':
+      return myConfirmed
+        ? { label: 'Confirmed by farmer', colorKey: 'CONFIRMED' }
+        : { label: 'Order placed', colorKey: 'PENDING' };
+    default:
+      return { label: String(st || 'PENDING'), colorKey: String(st || 'PENDING') };
+  }
+};
+
 const MyOrdersScreen = ({ navigation }) => {
   const { token, user } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
@@ -101,6 +141,8 @@ const MyOrdersScreen = ({ navigation }) => {
   const renderOrder = ({ item }) => {
     const sub = farmerSubtotal(item, farmerId);
     const shortId = item._id ? String(item._id).slice(-8).toUpperCase() : '—';
+    const { label: farmerStatusLabel, colorKey } = farmerFacingStatusSummary(item, farmerId);
+    const pillColor = statusColor(colorKey);
 
     return (
       <TouchableOpacity
@@ -110,8 +152,8 @@ const MyOrdersScreen = ({ navigation }) => {
       >
         <View style={styles.cardTop}>
           <Text style={styles.orderRef}>Order #{shortId}</Text>
-          <View style={[styles.statusPill, { backgroundColor: `${statusColor(item.status)}22` }]}>
-            <Text style={[styles.statusText, { color: statusColor(item.status) }]}>{item.status}</Text>
+          <View style={[styles.statusPill, { backgroundColor: `${pillColor}22` }]}>
+            <Text style={[styles.statusText, { color: pillColor }]}>{farmerStatusLabel}</Text>
           </View>
         </View>
         <Text style={styles.customerName}>{item.customerName || 'Customer'}</Text>

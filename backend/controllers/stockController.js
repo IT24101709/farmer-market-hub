@@ -31,7 +31,7 @@ const syncAvailabilityFields = (stock) => {
 // @access  Private
 exports.getAvailableStocks = async (req, res) => {
   try {
-    const { category, minPrice, maxPrice, search, farmerId } = req.query;
+    const { category, minPrice, maxPrice, search, farmerId, sort = 'newest' } = req.query;
 
     const filter = {
       availabilityStatus: true,
@@ -55,10 +55,19 @@ exports.getAvailableStocks = async (req, res) => {
       if (maxPrice) filter.pricePerKg.$lte = Number(maxPrice);
     }
 
+    const sortMap = {
+      newest: { createdAt: -1 },
+      name: { name: 1, createdAt: -1 },
+      priceAsc: { pricePerKg: 1, createdAt: -1 },
+      priceDesc: { pricePerKg: -1, createdAt: -1 },
+      qtyDesc: { quantity: -1, createdAt: -1 }
+    };
+    const sortSpec = sortMap[String(sort)] || sortMap.newest;
+
     const stocks = await Stock.find(filter)
       .populate('farmerId', 'name email profileDetails')
       .populate('categoryId', 'name')
-      .sort({ createdAt: -1 })
+      .sort(sortSpec)
       .lean();
 
     res.status(200).json(stocks);
@@ -129,9 +138,10 @@ exports.createStock = async (req, res) => {
   } catch (error) {
     console.error('Create stock error:', error);
     if (error.code === 11000) {
+      const duplicateFields = Object.keys(error.keyPattern || {});
+      const friendly = duplicateFields.length ? duplicateFields.join(', ') : 'a unique field';
       return res.status(400).json({
-        message:
-          'You already have stock with this vegetable name and harvest date. Change the name or harvest date, or edit the existing item.'
+        message: `Duplicate value for ${friendly}. Change the conflicting field and try again.`
       });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -143,7 +153,7 @@ exports.createStock = async (req, res) => {
 // @access  Private
 exports.getMyStocks = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, lowStock } = req.query;
+    const { page = 1, limit = 20, status, lowStock, sort = 'newest' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     let query = { 
@@ -154,10 +164,19 @@ exports.getMyStocks = async (req, res) => {
     if (status) query.status = status;
     if (lowStock === 'true') query.quantity = { $lt: 10 };
 
+    const sortMap = {
+      newest: { createdAt: -1 },
+      name: { name: 1, createdAt: -1 },
+      priceAsc: { pricePerKg: 1, createdAt: -1 },
+      priceDesc: { pricePerKg: -1, createdAt: -1 },
+      qtyDesc: { quantity: -1, createdAt: -1 }
+    };
+    const sortSpec = sortMap[String(sort)] || sortMap.newest;
+
     const [stocks, total] = await Promise.all([
       Stock.find(query)
         .populate('categoryId', 'name')
-        .sort({ createdAt: -1 })
+        .sort(sortSpec)
         .skip(skip)
         .limit(Number(limit))
         .lean(),
@@ -274,7 +293,8 @@ syncAvailabilityFields(stock);
       if (stock.imageUrl && stock.imageUrl !== newImageUrl) {
         const fs = require('fs');
         const path = require('path');
-        const filePath = path.join(__dirname, '..', stock.imageUrl);
+        const relImg = String(stock.imageUrl || '').replace(/^[/\\]+/, '');
+        const filePath = path.join(__dirname, '..', '..', relImg);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
@@ -330,7 +350,8 @@ exports.deleteStock = async (req, res) => {
     if (stock.imageUrl) {
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, '..', stock.imageUrl);
+      const relImg = String(stock.imageUrl || '').replace(/^[/\\]+/, '');
+      const filePath = path.join(__dirname, '..', '..', relImg);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

@@ -23,11 +23,11 @@ function normalizeError(error, fallback) {
   return err;
 }
 
-export const createOrder = async ({ customerName, items }, token) => {
+export const createOrder = async ({ customerName, items, deliveryAddress, note }, token) => {
   try {
     const response = await axios.post(
       API_URL,
-      { customerName, items },
+      { customerName, items, deliveryAddress: deliveryAddress || '', note: note || '' },
       { headers: authHeaders(token) }
     );
     return response.data;
@@ -68,3 +68,40 @@ export const updateOrder = async (orderId, body, token) => {
     throw normalizeError(error, 'Failed to update order');
   }
 };
+
+export const updateOrderStatus = async (orderId, status, notes, token) => {
+  try {
+    const response = await axios.patch(`${API_URL}/${orderId}/status`, { status, notes }, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to update order status');
+  }
+};
+
+export const cancelOrder = async (orderId, token) => {
+  try {
+    const response = await axios.put(`${API_URL}/${orderId}`, { status: 'Cancelled' }, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to cancel order');
+  }
+};
+
+export const getAllOrders = async (token, params = {}) => {
+  try {
+    const response = await axios.get(API_URL, {
+      headers: authHeaders(token),
+      params
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to load orders');
+  }
+};
+
+// Alias used by AdminOrdersScreen
+export const getAdminOrders = getAllOrders;

@@ -122,13 +122,20 @@ const validateStockData = async (req, res, next) => {
         return res.status(400).json({ message: 'Price must be at least 0.01.' });
       }
 
-      const min = req.stockLimits?.minPriceLimit ?? 1;
-      const max = req.stockLimits?.maxPriceLimit ?? 100000;
-
-      if (price < min || price > max) {
-        return res.status(400).json({
-          message: `Price must be between LKR ${min} and LKR ${max} per kg for the selected category.`
-        });
+      if (req.stockLimits) {
+        const min = Number(req.stockLimits.minPriceLimit ?? 1);
+        const maxRaw = req.stockLimits.maxPriceLimit;
+        if (Number.isFinite(maxRaw)) {
+          if (price < min || price > maxRaw) {
+            return res.status(400).json({
+              message: `Price must be between LKR ${min} and LKR ${maxRaw} per kg for the selected category.`
+            });
+          }
+        } else if (price < min) {
+          return res.status(400).json({
+            message: `Price must be at least LKR ${min} per kg for the selected category.`
+          });
+        }
       }
 
       validatedData.pricePerKg = price;

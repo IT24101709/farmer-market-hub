@@ -1,26 +1,30 @@
-import { Router } from "express";
-import {
-  approveOrder,
-  downloadAdminReport,
-  getAdminRequests,
-  getCustomerDashboardCards,
-  getOverview,
-  getPaymentById,
-  getPaymentByOrderId,
+const express = require('express');
+const router = express.Router();
+const {
   processPayment,
-  rejectOrder
-} from "../controllers/paymentController.js";
+  getOverview,
+  getMyPayments,
+  getPaymentByOrderId,
+  getPaymentById
+} = require('../controllers/paymentController');
+const { protect, adminRole, customerRole } = require('../middleware/authMiddleware');
 
-const router = Router();
+// All payment routes require authentication
+router.use(protect);
 
-router.post("/process", processPayment);
-router.get("/overview", getOverview);
-router.get("/customers/dashboard", getCustomerDashboardCards);
-router.get("/admin/requests", getAdminRequests);
-router.post("/admin/requests/:orderId/approve", approveOrder);
-router.post("/admin/requests/:orderId/reject", rejectOrder);
-router.get("/admin/report", downloadAdminReport);
-router.get("/order/:orderId", getPaymentByOrderId);
-router.get("/:paymentId", getPaymentById);
+// Customer: pay for a confirmed order
+router.post('/process', customerRole, processPayment);
 
-export default router;
+// Admin: full payment overview + stats
+router.get('/overview', adminRole, getOverview);
+
+// Customer: their own payment history (must come before /:id)
+router.get('/my', customerRole, getMyPayments);
+
+// Any authenticated user: payment by order ID (must come before /:id)
+router.get('/order/:orderId', getPaymentByOrderId);
+
+// Any authenticated user: payment by payment ID
+router.get('/:id', getPaymentById);
+
+module.exports = router;

@@ -1,49 +1,53 @@
 const mongoose = require('mongoose');
 
-const deliveryItemSchema = new mongoose.Schema({
+const deliverySchema = new mongoose.Schema({
   orderId: {
-    type: mongoose.Schema.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
+    required: true,
+    unique: true
+  },
+  agentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  customerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true
   },
-  customerName: String,
-  customerAddress: String,
-  customerPhone: String,
-  items: String, // List of items
-  amount: Number,
+  deliveryAddress: {
+    type: String,
+    required: true
+  },
   status: {
     type: String,
-    enum: ['Pending', 'In Transit', 'Delivered', 'Cancelled'],
-    default: 'Pending'
+    enum: ['pending', 'assigned', 'in-transit', 'delivered', 'cancelled'],
+    default: 'pending'
   },
-  deliveredAt: Date,
-  notes: String
-}, { _id: true });
-
-const deliverySchema = new mongoose.Schema({
-  agentId: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
-  },
-  deliveries: [deliveryItemSchema],
-  totalDeliveries: {
-    type: Number,
-    default: 0
-  },
-  completedDeliveries: {
-    type: Number,
-    default: 0
-  },
-  date: {
+  assignedAt: {
     type: Date,
-    default: Date.now
+    default: null
+  },
+  pickedUpAt: {
+    type: Date,
+    default: null
+  },
+  deliveredAt: {
+    type: Date,
+    default: null
+  },
+  note: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true
 });
 
-deliverySchema.index({ agentId: 1, date: -1 });
+// Indexes
+deliverySchema.index({ status: 1, createdAt: -1 });
+deliverySchema.index({ agentId: 1, status: 1 });
 
 module.exports = mongoose.model('Delivery', deliverySchema);

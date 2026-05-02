@@ -19,7 +19,95 @@ function normalizeError(error, fallback) {
   return err;
 }
 
-// Delivery Agent APIs
+// ============ New Delivery APIs (per-order) ============
+
+// Create delivery (admin)
+export const createDelivery = async (body, token) => {
+  try {
+    const response = await axios.post(API_URL, body, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to create delivery');
+  }
+};
+
+// Get all deliveries (admin)
+export const getAllDeliveries = async (token, params = {}) => {
+  try {
+    const response = await axios.get(API_URL, {
+      params,
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to load deliveries');
+  }
+};
+
+// Get agent's deliveries (agent only)
+export const getMyDeliveries = async (token) => {
+  try {
+    const response = await axios.get(`${API_URL}/my`, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to load my deliveries');
+  }
+};
+
+// Get delivery by ID
+export const getDeliveryById = async (deliveryId, token) => {
+  try {
+    const response = await axios.get(`${API_URL}/${deliveryId}`, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to load delivery');
+  }
+};
+
+// Assign agent (admin)
+export const assignAgent = async (deliveryId, agentId, token) => {
+  try {
+    const response = await axios.patch(`${API_URL}/${deliveryId}/assign`, { agentId }, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to assign agent');
+  }
+};
+
+// Update delivery status (agent)
+export const updateDeliveryStatus = async (deliveryId, status, token) => {
+  try {
+    const response = await axios.patch(`${API_URL}/${deliveryId}/status`, { status }, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to update status');
+  }
+};
+
+// Cancel delivery (admin)
+export const cancelDelivery = async (deliveryId, token) => {
+  try {
+    const response = await axios.patch(`${API_URL}/${deliveryId}/cancel`, {}, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to cancel delivery');
+  }
+};
+
+// ============ Legacy Delivery Agent APIs ============
+
 export const getDashboard = async (token) => {
   try {
     const response = await axios.get(`${API_URL}/dashboard`, {
@@ -54,19 +142,6 @@ export const getDeliveryHistory = async (token, page = 1, limit = 20) => {
   }
 };
 
-export const updateDeliveryStatus = async (deliveryId, itemId, body, token) => {
-  try {
-    const response = await axios.put(
-      `${API_URL}/${deliveryId}/item/${itemId}`,
-      body,
-      { headers: authHeaders(token) }
-    );
-    return response.data;
-  } catch (error) {
-    throw normalizeError(error, 'Failed to update status');
-  }
-};
-
 export const shipOrder = async (orderId, token) => {
   try {
     const response = await axios.put(
@@ -80,7 +155,8 @@ export const shipOrder = async (orderId, token) => {
   }
 };
 
-// Admin APIs
+// ============ Admin APIs ============
+
 export const getAllDeliveriesAdmin = async (token, query = {}) => {
   try {
     const response = await axios.get(`${ADMIN_API_URL}/deliveries`, {

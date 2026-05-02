@@ -1,320 +1,291 @@
 const Delivery = require('../models/Delivery');
 const Order = require('../models/Order');
+const User = require('../models/User');
 const { notifyUser } = require('../utils/orderNotifications');
 
 const uid = (user) => String(user?.id || user?._id || '');
 
-// @desc    Get delivery agent's dashboard
-// @route   GET /api/deliveries/dashboard
-// @access  Private DeliveryAgent
-exports.getDashboard = async (req, res) => {
-  try {
-    const agentId = uid(req.user);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const todayDelivery = await Delivery.findOne({
-      agentId,
-      date: { $gte: today }
-    }).sort({ createdAt: -1 });
-
-    const pendingCount = todayDelivery?.deliveries.filter(d => d.status === 'Pending').length || 0;
-    const inTransitCount = todayDelivery?.deliveries.filter(d => d.status === 'In Transit').length || 0;
-    const deliveredCount = todayDelivery?.deliveries.filter(d => d.status === 'Delivered').length || 0;
-
-    res.status(200).json({
-      success: true,
-      data: {
-        today: todayDelivery,
-        pendingCount,
-        inTransitCount,
-        deliveredCount,
-        totalCount: todayDelivery?.deliveries?.length || 0
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Get agent's delivery history
-// @route   GET /api/deliveries/history
-// @access  Private DeliveryAgent
-exports.getHistory = async (req, res) => {
-  try {
-    const agentId = uid(req.user);
-    const { page = 1, limit = 20 } = req.query;
-    
-    const deliveries = await Delivery.find({ agentId })
-      .sort({ date: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
-
-    const total = await Delivery.countDocuments({ agentId });
-
-    res.status(200).json({
-      success: true,
-      data: deliveries,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Get today's deliveries for agent
-// @route   GET /api/deliveries/today
-// @access  Private DeliveryAgent
-exports.getTodayDeliveries = async (req, res) => {
-  try {
-    const agentId = uid(req.user);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    let delivery = await Delivery.findOne({
-      agentId,
-      date: { $gte: today, $lt: tomorrow }
-    });
-
-    if (!delivery) {
-      delivery = await Delivery.create({
-        agentId,
-        deliveries: [],
-        date: new Date()
-      });
-    }
-
-    res.status(200).json({ success: true, data: delivery });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Update delivery status (agent updates their delivery)
-// @route   PUT /api/deliveries/:deliveryId/item/:itemId
-// @access  Private DeliveryAgent
-exports.updateDeliveryStatus = async (req, res) => {
-  try {
-    const { deliveryId, itemId } = req.params;
-    const { status, notes } = req.body;
-    const agentId = uid(req.user);
-
-    const delivery = await Delivery.findOne({ _id: deliveryId, agentId });
-    if (!delivery) {
-      return res.status(404).json({ success: false, message: 'Delivery not found' });
-    }
-
-    const item = delivery.deliveries.id(itemId);
-    if (!item) {
-      return res.status(404).json({ success: false, message: 'Delivery item not found' });
-    }
-
-    if (status) {
-      item.status = status;
-      if (status === 'Delivered') {
-        item.deliveredAt = new Date();
-        delivery.completedDeliveries = (delivery.completedDeliveries || 0) + 1;
-        
-        // Update order status to delivered
-        await Order.findByIdAndUpdate(item.orderId, { status: 'Delivered' });
-        
-        // Notify customer
-        if (item.customerPhone) {
-          await notifyUser(item.customerPhone, {
-            title: 'Order delivered',
-            body: `Your order #${String(item.orderId).slice(-6).toUpperCase()} has been delivered!`,
-            orderId: item.orderId,
-            type: 'order_delivered'
-          });
-        }
-      } else if (status === 'In Transit') {
-        item.status = 'In Transit';
-        
-        // Notify customer
-        if (item.customerPhone) {
-          await notifyUser(item.customerPhone, {
-            title: 'Order in transit',
-            body: `Your order #${String(item.orderId).slice(-6).toUpperCase()} is on the way!`,
-            orderId: item.orderId,
-            type: 'order_transit'
-          });
-        }
-      } else if (status === 'Cancelled') {
-        item.status = 'Cancelled';
-        
-        // Notify customer
-        if (item.customerPhone) {
-          await notifyUser(item.customerPhone, {
-            title: 'Delivery cancelled',
-            body: `Delivery for order #${String(item.orderId).slice(-6).toUpperCase()} was cancelled.`,
-            orderId: item.orderId,
-            type: 'delivery_cancelled'
-          });
-        }
-      }
-    }
-
-    if (notes) {
-      item.notes = notes;
-    }
-
-    await delivery.save();
-
-    res.status(200).json({
-      success: true,
-      data: item,
-      message: `Delivery ${status ? `marked ${status}` : 'updated'}`
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Get all deliveries (admin only)
-// @route   GET /api/admin/deliveries
+// @desc    Create delivery (admin only)
+// @route   POST /api/deliveries
 // @access  Private Admin
-exports.getAllDeliveriesAdmin = async (req, res) => {
+exports.createDelivery = async (req, res) => {
   try {
-    const { status, agentId, date, page = 1, limit = 20 } = req.query;
-    const filter = {};
+    const { orderId, customerId, deliveryAddress } = req.body;
 
-    if (status) {
-      filter['deliveries.status'] = status;
-    }
-    if (agentId) {
-      filter.agentId = agentId;
-    }
-    if (date) {
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      const nextDay = new Date(d);
-      nextDay.setDate(nextDay.getDate() + 1);
-      filter.date = { $gte: d, $lt: nextDay };
+    if (!orderId) {
+      return res.status(400).json({ message: 'Order ID is required' });
     }
 
-    const deliveries = await Delivery.find(filter)
-      .populate('agentId', 'name email')
-      .sort({ date: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
-
-    const total = await Delivery.countDocuments(filter);
-
-    res.status(200).json({
-      success: true,
-      data: deliveries,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Assign orders to delivery agent (admin)
-// @route   POST /api/admin/deliveries/assign
-// @access  Private Admin
-exports.assignDelivery = async (req, res) => {
-  try {
-    const { agentId, orderIds } = req.body;
-
-    if (!agentId || !orderIds?.length) {
-      return res.status(400).json({
-        success: false,
-        message: 'Agent ID and order IDs are required'
-      });
+    // Check order exists and is confirmed
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Get delivery agent's daily record or create new one
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    let delivery = await Delivery.findOne({
-      agentId,
-      date: { $gte: today, $lt: tomorrow }
-    });
-
-    const newItems = [];
-    for (const orderId of orderIds) {
-      const order = await Order.findById(orderId);
-      if (!order || order.status !== 'Shipped') continue;
-
-      // Check if already assigned
-      if (delivery?.deliveries.some(d => String(d.orderId) === String(orderId))) continue;
-
-      const itemsList = order.items?.map(i => i.product).join(', ') || 'Items';
-      
-      newItems.push({
-        orderId: order._id,
-        customerName: order.customerName,
-        customerAddress: order.items?.[0]?.stockId || 'Address',
-        customerPhone: order.customerId,
-        items: itemsList,
-        amount: order.totalAmount,
-        status: 'Pending'
-      });
-
-      // Update order to shipped
-      await Order.findByIdAndUpdate(orderId, { status: 'Shipped' });
+    if (order.status !== 'CONFIRMED' && order.status !== 'confirmed') {
+      return res.status(400).json({ message: 'Order must be confirmed before creating delivery' });
     }
 
-    if (delivery) {
-      delivery.deliveries.push(...newItems);
-      delivery.totalDeliveries = (delivery.totalDeliveries || 0) + newItems.length;
-    } else {
-      delivery = await Delivery.create({
-        agentId,
-        deliveries: newItems,
-        totalDeliveries: newItems.length,
-        completedDeliveries: 0,
-        date: new Date()
-      });
+    // Check if delivery already exists
+    const existingDelivery = await Delivery.findOne({ orderId });
+    if (existingDelivery) {
+      return res.status(400).json({ message: 'Delivery already exists for this order' });
     }
 
-    await delivery.save();
-
-    // Notify agent
-    await notifyUser(agentId, {
-      title: 'New deliveries assigned',
-      body: `${newItems.length} new delivery ${newItems.length === 1 ? 'order' : 'orders'} assigned to you today.`,
-      type: 'delivery_assigned'
+    const delivery = await Delivery.create({
+      orderId,
+      customerId: customerId || order.customerId,
+      deliveryAddress: deliveryAddress || order.deliveryAddress || 'Address not provided',
+      status: 'pending'
     });
 
     res.status(201).json({
       success: true,
       data: delivery,
-      message: `${newItems.length} delivery ${newItems.length === 1 ? 'order' : 'orders'} assigned`
+      message: 'Delivery created successfully'
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Get all delivery agents (admin)
-// @route   GET /api/admin/delivery-agents
+// @desc    Get all deliveries (admin only)
+// @route   GET /api/deliveries
 // @access  Private Admin
-exports.getDeliveryAgents = async (req, res) => {
+exports.getAllDeliveries = async (req, res) => {
   try {
-    const User = require('../models/User');
-    const agents = await User.find({ role: 'DeliveryAgent', status: 'Active' })
-      .select('name email profileDetails.phone profileDetails.region');
+    const { status } = req.query;
+    const filter = {};
     
-    res.status(200).json({ success: true, data: agents });
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
+    const deliveries = await Delivery.find(filter)
+      .populate('orderId', 'items totalAmount')
+      .populate('agentId', 'name email')
+      .populate('customerId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: deliveries.length,
+      data: deliveries
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get agent's deliveries (agent only)
+// @route   GET /api/deliveries/my
+// @access  Private DeliveryAgent
+exports.getMyDeliveries = async (req, res) => {
+  try {
+    const agentId = uid(req.user);
+
+    const deliveries = await Delivery.find({ agentId })
+      .populate('orderId', 'items totalAmount')
+      .populate('customerId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: deliveries.length,
+      data: deliveries
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get delivery by ID
+// @route   GET /api/deliveries/:id
+// @access  Private
+exports.getDeliveryById = async (req, res) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id)
+      .populate('orderId', 'items totalAmount customerName')
+      .populate('agentId', 'name email')
+      .populate('customerId', 'name email');
+
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found' });
+    }
+
+    const userId = uid(req.user);
+    const isAdmin = req.user.role === 'Admin';
+    const isAgent = String(delivery.agentId) === userId;
+    const isCustomer = String(delivery.customerId) === userId;
+
+    if (!isAdmin && !isAgent && !isCustomer) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: delivery
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Assign agent to delivery (admin only)
+// @route   PATCH /api/deliveries/:id/assign
+// @access  Private Admin
+exports.assignAgent = async (req, res) => {
+  try {
+    const { agentId } = req.body;
+
+    if (!agentId) {
+      return res.status(400).json({ message: 'Agent ID is required' });
+    }
+
+    // Check agent exists and has agent role
+    const agent = await User.findById(agentId);
+    if (!agent || (agent.role !== 'DeliveryAgent' && agent.role !== 'agent')) {
+      return res.status(400).json({ message: 'Invalid delivery agent' });
+    }
+
+    const delivery = await Delivery.findById(req.params.id);
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found' });
+    }
+
+    if (delivery.status !== 'pending') {
+      return res.status(400).json({ message: 'Can only assign to pending deliveries' });
+    }
+
+    delivery.agentId = agentId;
+    delivery.status = 'assigned';
+    delivery.assignedAt = new Date();
+    await delivery.save();
+
+    // Notify agent
+    await notifyUser(agentId, {
+      title: 'New delivery assigned',
+      body: `You have been assigned a new delivery. Order #${String(delivery.orderId).slice(-6).toUpperCase()}`,
+      deliveryId: delivery._id,
+      type: 'delivery_assigned'
+    });
+
+    res.status(200).json({
+      success: true,
+      data: delivery,
+      message: 'Agent assigned successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update delivery status (agent only)
+// @route   PATCH /api/deliveries/:id/status
+// @access  Private DeliveryAgent
+exports.updateStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const delivery = await Delivery.findById(req.params.id);
+
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found' });
+    }
+
+    const userId = uid(req.user);
+    const isAssignedAgent = String(delivery.agentId) === userId;
+
+    if (!isAssignedAgent && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Only assigned agent can update status' });
+    }
+
+    // Validate status transitions
+    const validTransitions = {
+      'assigned': 'in-transit',
+      'in-transit': 'delivered'
+    };
+
+    const currentStatus = delivery.status;
+    const allowedNextStatus = validTransitions[currentStatus];
+
+    if (!allowedNextStatus || status !== allowedNextStatus) {
+      return res.status(400).json({
+        message: `Invalid status transition from ${currentStatus}. Next status must be ${allowedNextStatus}`
+      });
+    }
+
+    // Update status and timestamps
+    delivery.status = status;
+    if (status === 'in-transit') {
+      delivery.pickedUpAt = new Date();
+    } else if (status === 'delivered') {
+      delivery.deliveredAt = new Date();
+      
+      // Update linked Order status to completed
+      await Order.findByIdAndUpdate(delivery.orderId, { 
+        status: 'completed',
+        legacyStatus: 'Delivered'
+      });
+
+      // Notify customer
+      if (delivery.customerId) {
+        await notifyUser(String(delivery.customerId), {
+          title: 'Order delivered',
+          body: `Your order has been delivered! Thank you for your purchase.`,
+          orderId: delivery.orderId,
+          type: 'order_delivered'
+        });
+      }
+    }
+
+    await delivery.save();
+
+    res.status(200).json({
+      success: true,
+      data: delivery,
+      message: `Delivery status updated to ${status}`
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Cancel delivery (admin only)
+// @route   PATCH /api/deliveries/:id/cancel
+// @access  Private Admin
+exports.cancelDelivery = async (req, res) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id);
+
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found' });
+    }
+
+    if (delivery.status !== 'pending' && delivery.status !== 'assigned') {
+      return res.status(400).json({
+        message: 'Can only cancel pending or assigned deliveries'
+      });
+    }
+
+    delivery.status = 'cancelled';
+    await delivery.save();
+
+    // Notify agent if one was assigned
+    if (delivery.agentId) {
+      await notifyUser(String(delivery.agentId), {
+        title: 'Delivery cancelled',
+        body: `Delivery #${String(delivery._id).slice(-6).toUpperCase()} has been cancelled.`,
+        type: 'delivery_cancelled'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: delivery,
+      message: 'Delivery cancelled'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -323,14 +294,15 @@ exports.getDeliveryAgents = async (req, res) => {
 // @access  Private Admin
 exports.getPendingShipments = async (req, res) => {
   try {
-    const orders = await Order.find({ status: 'Processing' })
+    const Order = require('../models/Order');
+    const orders = await Order.find({ status: 'CONFIRMED' })
       .select('customerName totalAmount items status createdAt')
       .sort({ createdAt: -1 })
       .limit(50);
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -346,100 +318,48 @@ exports.getDeliveryStats = async (req, res) => {
     const stats = await Delivery.aggregate([
       {
         $match: {
-          date: { $gte: startDate }
+          createdAt: { $gte: startDate }
         }
-      },
-      {
-        $unwind: '$deliveries'
       },
       {
         $group: {
-          _id: '$agentId',
-          total: { $sum: 1 },
-          completed: {
-            $sum: { $cond: [{ $eq: ['$deliveries.status', 'Delivered'] }, 1, 0] }
-          },
-          pending: {
-            $sum: { $cond: [{ $eq: ['$deliveries.status', 'Pending'] }, 1, 0] }
-          },
-          inTransit: {
-            $sum: { $cond: [{ $eq: ['$deliveries.status', 'In Transit'] }, 1, 0] }
-          }
-        }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'agent'
-        }
-      },
-      {
-        $unwind: '$agent'
-      },
-      {
-        $project: {
-          agentName: '$agent.name',
-          total: 1,
-          completed: 1,
-          pending: 1,
-          inTransit: 1
+          _id: '$status',
+          total: { $sum: 1 }
         }
       }
     ]);
 
-    res.status(200).json({ success: true, data: stats });
+    const result = {
+      total: 0,
+      pending: 0,
+      assigned: 0,
+      'in-transit': 0,
+      delivered: 0,
+      cancelled: 0
+    };
+
+    stats.forEach(s => {
+      result[s._id] = s.total;
+      result.total += s.total;
+    });
+
+    res.status(200).json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Mark order as shipped (farmer)
-// @route   PUT /api/deliveries/ship/:orderId
-// @access  Private Farmer
-exports.shipOrder = async (req, res) => {
+// @desc    Get delivery agents (admin)
+// @route   GET /api/admin/delivery-agents
+// @access  Private Admin
+exports.getDeliveryAgents = async (req, res) => {
   try {
-    const { orderId } = req.params;
-    const farmerId = uid(req.user);
+    const agents = await User.find({ 
+      $or: [{ role: 'DeliveryAgent' }, { role: 'agent' }]
+    }).select('name email profileDetails');
 
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    // Check if farmer is part of this order
-    const isFarmer = order.items?.some(i => String(i.farmerId) === farmerId);
-    if (!isFarmer && req.user.role !== 'Admin') {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-
-    if (order.status !== 'Processing') {
-      return res.status(400).json({
-        success: false,
-        message: 'Order must be Processing to ship'
-      });
-    }
-
-    order.status = 'Shipped';
-    await order.save();
-
-    // Notify customer
-    if (order.customerId) {
-      await notifyUser(String(order.customerId), {
-        title: 'Order shipped',
-        body: `Your order #${String(order._id).slice(-6).toUpperCase()} has been shipped!`,
-        orderId: order._id,
-        type: 'order_shipped'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: order,
-      message: 'Order marked as shipped'
-    });
+    res.status(200).json({ success: true, data: agents });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };

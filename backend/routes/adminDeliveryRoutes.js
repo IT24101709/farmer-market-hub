@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getAllDeliveriesAdmin,
-  assignDelivery,
+  getAllDeliveries,
+  assignAgent,
   getDeliveryAgents,
   getPendingShipments,
   getDeliveryStats
@@ -10,8 +10,8 @@ const {
 const { protect, adminRole } = require('../middleware/authMiddleware');
 
 // Admin delivery management routes
-router.get('/deliveries', protect, adminRole, getAllDeliveriesAdmin);
-router.post('/deliveries/assign', protect, adminRole, assignDelivery);
+router.get('/deliveries', protect, adminRole, getAllDeliveries);
+router.patch('/:id/assign', protect, adminRole, assignAgent);
 router.get('/delivery-agents', protect, adminRole, getDeliveryAgents);
 router.get('/shipments/pending', protect, adminRole, getPendingShipments);
 router.get('/deliveries/stats', protect, adminRole, getDeliveryStats);

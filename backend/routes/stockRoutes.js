@@ -32,6 +32,15 @@ const handleUpload = (req, res, next) => {
   });
 };
 
+/** JSON updates must not go through multer (can break parsed body on some stacks). */
+const maybeHandleUpload = (req, res, next) => {
+  const ct = (req.headers['content-type'] || '').toLowerCase();
+  if (ct.includes('multipart/form-data')) {
+    return handleUpload(req, res, next);
+  }
+  return next();
+};
+
 // Route mapping
 router.route('/')
   .get(protect, getAvailableStocks)
@@ -52,7 +61,7 @@ router.route('/expired/all')
 
 router.route('/:id')
   .get(protect, farmerRole, getStockById)
-  .put(protect, farmerRole, handleUpload, validateStockData, updateStock)
+  .put(protect, farmerRole, maybeHandleUpload, validateStockData, updateStock)
   .delete(protect, farmerRole, deleteStock);
 
 router.route('/:id/visibility')

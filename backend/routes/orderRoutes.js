@@ -12,13 +12,16 @@ const {
   startDelivery,
   completeDelivery,
   adminApproveOrder,
-  setOrderStatus
+  setOrderStatus,
+  updateOrderStatus,
+  getAllOrders
 } = require('../controllers/orderController');
 const { protect, customerRole, adminRole, farmerRole, deliveryRole } = require('../middleware/authMiddleware');
 
 // Order lifecycle routes (step-by-step)
 router.post('/', protect, customerRole, createOrder);
 router.get('/my', protect, customerRole, getMyOrders);
+router.get('/', protect, adminRole, getAllOrders);
 router.get('/:id', protect, getOrderById);
 router.put('/:id', protect, updateOrder);
 router.delete('/:id', protect, adminRole, deleteOrder);
@@ -37,5 +40,7 @@ router.put('/:id/complete-delivery', protect, deliveryRole, completeDelivery);
 router.put('/:id/admin-approve', protect, adminRole, adminApproveOrder);
 // Admin: Set order status directly
 router.put('/:id/set-status', protect, adminRole, setOrderStatus);
+// Admin: Update order status (PATCH)
+router.patch('/:id/status', protect, adminRole, updateOrderStatus);
 
 module.exports = router;

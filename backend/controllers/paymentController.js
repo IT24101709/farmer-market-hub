@@ -1,333 +1,156 @@
-import { Order } from "../models/Order.js";
-import { Payment } from "../models/Payment.js";
-import { User } from "../models/User.js";
-import { getNextSequence } from "../utils/counter.js";
+const Payment = require('../models/Payment');
+const Order = require('../models/Order');
 
-function badRequest(message) {
-  const error = new Error(message);
-  error.statusCode = 400;
-  return error;
+function generateTransactionRef() {
+  return `TXN${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
 
-function notFound(message) {
-  const error = new Error(message);
-  error.statusCode = 404;
-  return error;
-}
-
-function sanitizeCsv(value) {
-  if (value === null || value === undefined) return "";
-  return String(value).replace(/,/g, " ");
-}
-
-function mapPaymentResponse(payment, order) {
-  return {
-    paymentId: payment?.paymentId ?? null,
-    orderId: order.orderId,
-    transactionId: payment?.transactionReference ?? `REJECTED-ORD${order.orderId}`,
-    paymentStatus: payment?.paymentStatus ?? "FAILED",
-    paymentMethod: payment?.paymentMethod ?? "N/A",
-    amountPaid: order.totalAmount,
-    paymentDate: payment?.paymentDate ?? order.orderDate
-  };
-}
-
-function isValidLuhn(cardNumber) {
-  if (!cardNumber) return false;
-  let sum = 0;
-  let alternate = false;
-  for (let i = cardNumber.length - 1; i >= 0; i -= 1) {
-    let n = Number(cardNumber[i]);
-    if (alternate) {
-      n *= 2;
-      if (n > 9) n = (n % 10) + 1;
-    }
-    sum += n;
-    alternate = !alternate;
-  }
-  return sum % 10 === 0;
-}
-
-function validateCard(payload) {
-  const method = String(payload.paymentMethod || "").toUpperCase();
-  if (method !== "CREDIT/DEBIT CARD" && method !== "CARD") {
-    return true;
-  }
-
-  if (!/^\d{12,19}$/.test(String(payload.cardNumber || ""))) return false;
-  if (!/^\d{3,4}$/.test(String(payload.cvv || ""))) return false;
-  if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(String(payload.expiryDate || ""))) return false;
-
-  return isValidLuhn(String(payload.cardNumber));
-}
-
-function generateTransactionId() {
-  const random = Math.random().toString(36).slice(2, 10).toUpperCase();
-  return `TXN${random}`;
-}
-
-export async function processPayment(req, res, next) {
+// @desc    Process payment for a confirmed order (customer only)
+// @route   POST /api/payments/process
+// @access  Private Customer
+exports.processPayment = async (req, res) => {
   try {
-    const { orderId, paymentMethod } = req.body;
+    const { orderId, paymentMethod, note } = req.body;
+    const customerId = req.user._id || req.user.id;
 
     if (!orderId) {
-      throw badRequest("orderId is required.");
+      return res.status(400).json({ message: 'orderId is required' });
+    }
+    if (!paymentMethod) {
+      return res.status(400).json({ message: 'paymentMethod is required' });
     }
 
-    if (!paymentMethod || !String(paymentMethod).trim()) {
-      throw badRequest("paymentMethod is required.");
+    const validMethods = ['CASH', 'CARD', 'BANK_TRANSFER'];
+    if (!validMethods.includes(String(paymentMethod).toUpperCase())) {
+      return res.status(400).json({ message: `Invalid payment method. Valid: ${validMethods.join(', ')}` });
     }
 
-    const order = await Order.findOne({ orderId: Number(orderId) });
+    // Find order by MongoDB _id
+    const order = await Order.findById(orderId);
     if (!order) {
-      throw badRequest(`Order not found for id: ${orderId}`);
+      return res.status(404).json({ message: 'Order not found' });
     }
 
-    if (String(order.status).toUpperCase() !== "APPROVED") {
-      throw badRequest("Order is not approved by admin yet.");
+    // Ownership check — only the order's customer can pay
+    if (String(order.customerId) !== String(customerId)) {
+      return res.status(403).json({ message: 'You can only pay for your own orders' });
     }
 
-    const existing = await Payment.findOne({ orderId: order.orderId });
+    // Order must be CONFIRMED (farmer has accepted) before payment
+    if (order.status !== 'CONFIRMED') {
+      return res.status(400).json({
+        message: `Order must be CONFIRMED before payment. Current status: ${order.status}`
+      });
+    }
+
+    // Prevent duplicate payment
+    const existing = await Payment.findOne({ orderId });
     if (existing) {
-      throw badRequest(`Payment already exists for order: ${order.orderId}`);
+      return res.status(400).json({ message: 'Payment already exists for this order' });
     }
-
-    const success = validateCard(req.body);
-    const paymentStatus = success ? "SUCCESS" : "FAILED";
-
-    const paymentId = await getNextSequence("paymentId");
 
     const payment = await Payment.create({
-      paymentId,
-      orderId: order.orderId,
-      paymentMethod,
-      paymentStatus,
-      transactionReference: generateTransactionId()
+      orderId,
+      customerId,
+      paymentMethod: String(paymentMethod).toUpperCase(),
+      paymentStatus: 'SUCCESS',
+      transactionReference: generateTransactionRef(),
+      amount: order.totalAmount,
+      note: note || ''
     });
 
-    order.status = success ? "PAID" : "PAYMENT_FAILED";
-    await order.save();
+    // Populate for response
+    const populated = await Payment.findById(payment._id)
+      .populate('orderId', 'totalAmount customerName status items')
+      .populate('customerId', 'name email');
 
-    res.json(mapPaymentResponse(payment, order));
+    res.status(201).json({
+      success: true,
+      data: populated,
+      message: 'Payment processed successfully'
+    });
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: error.message });
   }
-}
+};
 
-export async function getPaymentById(req, res, next) {
+// @desc    Get all payments with stats (admin only)
+// @route   GET /api/payments/overview
+// @access  Private Admin
+exports.getOverview = async (req, res) => {
   try {
-    const paymentId = Number(req.params.paymentId);
-    const payment = await Payment.findOne({ paymentId });
+    const payments = await Payment.find()
+      .populate('orderId', 'totalAmount customerName status createdAt')
+      .populate('customerId', 'name email')
+      .sort({ createdAt: -1 });
+
+    const stats = {
+      total: payments.length,
+      success: payments.filter(p => p.paymentStatus === 'SUCCESS').length,
+      failed: payments.filter(p => p.paymentStatus === 'FAILED').length,
+      pending: payments.filter(p => p.paymentStatus === 'PENDING').length,
+      totalRevenue: payments
+        .filter(p => p.paymentStatus === 'SUCCESS')
+        .reduce((sum, p) => sum + (p.amount || 0), 0)
+    };
+
+    res.status(200).json({ success: true, data: payments, stats });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get customer's own payment history
+// @route   GET /api/payments/my
+// @access  Private Customer
+exports.getMyPayments = async (req, res) => {
+  try {
+    const customerId = req.user._id || req.user.id;
+
+    const payments = await Payment.find({ customerId })
+      .populate('orderId', 'totalAmount customerName status items createdAt')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: payments });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get payment by order ID
+// @route   GET /api/payments/order/:orderId
+// @access  Private
+exports.getPaymentByOrderId = async (req, res) => {
+  try {
+    const payment = await Payment.findOne({ orderId: req.params.orderId })
+      .populate('orderId', 'totalAmount customerName status items')
+      .populate('customerId', 'name email');
+
     if (!payment) {
-      throw badRequest(`Payment not found for id: ${req.params.paymentId}`);
+      return res.status(404).json({ message: 'Payment not found for this order' });
     }
 
-    const order = await Order.findOne({ orderId: payment.orderId });
-    if (!order) {
-      throw notFound(`Order not found for id: ${payment.orderId}`);
-    }
-
-    res.json(mapPaymentResponse(payment, order));
+    res.status(200).json({ success: true, data: payment });
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: error.message });
   }
-}
+};
 
-export async function getPaymentByOrderId(req, res, next) {
+// @desc    Get payment by payment ID
+// @route   GET /api/payments/:id
+// @access  Private
+exports.getPaymentById = async (req, res) => {
   try {
-    const orderId = Number(req.params.orderId);
-    const payment = await Payment.findOne({ orderId });
+    const payment = await Payment.findById(req.params.id)
+      .populate('orderId', 'totalAmount customerName status items')
+      .populate('customerId', 'name email');
+
     if (!payment) {
-      throw badRequest(`Payment not found for order id: ${req.params.orderId}`);
+      return res.status(404).json({ message: 'Payment not found' });
     }
 
-    const order = await Order.findOne({ orderId });
-    if (!order) {
-      throw notFound(`Order not found for id: ${orderId}`);
-    }
-
-    res.json(mapPaymentResponse(payment, order));
+    res.status(200).json({ success: true, data: payment });
   } catch (error) {
-    next(error);
+    res.status(500).json({ message: error.message });
   }
-}
-
-export async function getOverview(req, res, next) {
-  try {
-    const [orders, payments] = await Promise.all([
-      Order.find().sort({ orderDate: -1 }),
-      Payment.find().sort({ paymentDate: -1 })
-    ]);
-
-    const paymentByOrderId = new Map(payments.map((payment) => [payment.orderId, payment]));
-    const rejectedOrders = orders.filter((order) => String(order.status).toUpperCase() === "REJECTED");
-
-    const successCount = payments.filter((payment) => String(payment.paymentStatus).toUpperCase() === "SUCCESS").length;
-    const paymentFailedCount = payments.filter((payment) => String(payment.paymentStatus).toUpperCase() === "FAILED").length;
-    const failedTransactions = paymentFailedCount + rejectedOrders.length;
-
-    const paymentHistory = payments
-      .map((payment) => {
-        const order = orders.find((item) => item.orderId === payment.orderId);
-        return order ? mapPaymentResponse(payment, order) : null;
-      })
-      .filter(Boolean);
-
-    const rejectedHistory = rejectedOrders.map((order) => mapPaymentResponse(null, order));
-
-    const transactionHistory = [...paymentHistory, ...rejectedHistory].sort(
-      (a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)
-    );
-
-    res.json({
-      totalTransactions: successCount + failedTransactions,
-      successfulTransactions: successCount,
-      failedTransactions,
-      transactionHistory
-    });
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function getCustomerDashboardCards(req, res, next) {
-  try {
-    const [orders, users, payments] = await Promise.all([
-      Order.find().sort({ orderDate: -1 }).limit(50),
-      User.find(),
-      Payment.find()
-    ]);
-
-    const usersById = new Map(users.map((user) => [user.userId, user]));
-    const paymentsByOrderId = new Map(payments.map((payment) => [payment.orderId, payment]));
-
-    const cards = orders
-      .filter((order) => {
-        const customer = usersById.get(order.customerId);
-        return customer && String(customer.role).toUpperCase() === "CUSTOMER";
-      })
-      .map((order) => {
-        const customer = usersById.get(order.customerId);
-        const payment = paymentsByOrderId.get(order.orderId);
-        const paymentStatus = payment?.paymentStatus ?? "NOT_PAID";
-        const approved = String(order.status).toUpperCase() === "APPROVED";
-
-        return {
-          userId: customer.userId,
-          name: customer.name,
-          email: customer.email,
-          orderId: order.orderId,
-          totalAmount: order.totalAmount,
-          orderStatus: order.status,
-          paymentStatus,
-          canProcessPayment: approved && String(paymentStatus).toUpperCase() !== "SUCCESS"
-        };
-      });
-
-    res.json(cards);
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function getAdminRequests(req, res, next) {
-  try {
-    const [orders, users, payments] = await Promise.all([
-      Order.find().sort({ orderDate: -1 }).limit(50),
-      User.find(),
-      Payment.find()
-    ]);
-
-    const usersById = new Map(users.map((user) => [user.userId, user]));
-    const paymentsByOrderId = new Map(payments.map((payment) => [payment.orderId, payment]));
-
-    const rows = orders.map((order) => {
-      const customer = usersById.get(order.customerId);
-      return {
-        orderId: order.orderId,
-        customerName: customer?.name ?? "Unknown",
-        customerEmail: customer?.email ?? "unknown@example.com",
-        amount: order.totalAmount,
-        orderStatus: order.status,
-        paymentStatus: paymentsByOrderId.get(order.orderId)?.paymentStatus ?? "NOT_PAID",
-        orderDate: order.orderDate
-      };
-    });
-
-    res.json(rows);
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function approveOrder(req, res, next) {
-  try {
-    const orderId = Number(req.params.orderId);
-    const order = await Order.findOne({ orderId });
-    if (!order) {
-      throw badRequest(`Order not found for id: ${req.params.orderId}`);
-    }
-
-    order.status = "APPROVED";
-    await order.save();
-
-    res.status(200).send();
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function rejectOrder(req, res, next) {
-  try {
-    const orderId = Number(req.params.orderId);
-    const order = await Order.findOne({ orderId });
-    if (!order) {
-      throw badRequest(`Order not found for id: ${req.params.orderId}`);
-    }
-
-    order.status = "REJECTED";
-    await order.save();
-
-    res.status(200).send();
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function downloadAdminReport(req, res, next) {
-  try {
-    const [orders, users, payments] = await Promise.all([
-      Order.find().sort({ orderDate: -1 }).limit(50),
-      User.find(),
-      Payment.find()
-    ]);
-
-    const usersById = new Map(users.map((user) => [user.userId, user]));
-    const paymentsByOrderId = new Map(payments.map((payment) => [payment.orderId, payment]));
-
-    const header = "Order ID,Customer Name,Customer Email,Amount,Order Status,Payment Status,Order Date\n";
-    const body = orders
-      .map((order) => {
-        const customer = usersById.get(order.customerId);
-        const paymentStatus = paymentsByOrderId.get(order.orderId)?.paymentStatus ?? "NOT_PAID";
-        return [
-          order.orderId,
-          sanitizeCsv(customer?.name),
-          sanitizeCsv(customer?.email),
-          Number(order.totalAmount || 0).toFixed(2),
-          sanitizeCsv(order.status),
-          sanitizeCsv(paymentStatus),
-          order.orderDate ? new Date(order.orderDate).toISOString() : ""
-        ].join(",");
-      })
-      .join("\n");
-
-    const filename = `payment-report-${new Date().toISOString().slice(0, 10)}.csv`;
-
-    res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
-    res.setHeader("Content-Type", "text/csv");
-    res.send(header + body);
-  } catch (error) {
-    next(error);
-  }
-}
+};

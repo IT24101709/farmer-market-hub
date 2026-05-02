@@ -6,15 +6,17 @@ import {
   Image,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   useWindowDimensions,
-  View
+  View,
+  Platform
 } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
-import getEnvVars from '../config';
+import { resolveStockImageUrl } from '../config';
 import {
   deleteStock,
   getMyStocks,
@@ -22,13 +24,13 @@ import {
   updateStockAvailability
 } from '../services/stockService';
 
-const { apiUrl } = getEnvVars();
-const API_BASE = apiUrl.replace('/api', '');
-
-const imageUrlFor = (image) => {
-  if (!image) return null;
-  return image.startsWith('http') ? image : `${API_BASE}${image}`;
-};
+const SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'name', label: 'Name A→Z' },
+  { key: 'priceAsc', label: 'Price ↑' },
+  { key: 'priceDesc', label: 'Price ↓' },
+  { key: 'qtyDesc', label: 'Quantity ↓' }
+];
 
 const isAvailable = (stock) => stock.availabilityStatus === true || stock.status === 'Available';
 
@@ -46,6 +48,7 @@ const StockListScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   const gap = 12;
   const pagePadding = 16;
@@ -84,6 +87,25 @@ const StockListScreen = ({ navigation }) => {
     });
   }, [stocks, searchQuery]);
 
+  const sortedStocks = useMemo(() => {
+    const list = [...filteredStocks];
+    switch (sortBy) {
+      case 'name':
+        return list.sort((a, b) =>
+          String(a.name || a.vegetableName || '').localeCompare(String(b.name || b.vegetableName || ''))
+        );
+      case 'priceAsc':
+        return list.sort((a, b) => Number(a.pricePerKg || 0) - Number(b.pricePerKg || 0));
+      case 'priceDesc':
+        return list.sort((a, b) => Number(b.pricePerKg || 0) - Number(a.pricePerKg || 0));
+      case 'qtyDesc':
+        return list.sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0));
+      case 'newest':
+      default:
+        return list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+  }, [filteredStocks, sortBy]);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchStocks();
@@ -91,9 +113,24 @@ const StockListScreen = ({ navigation }) => {
 
   const confirmDelete = useCallback(
     (stock) => {
+      const msg = `Remove ${stock.vegetableName || stock.name} from your listings?`;
+      if (Platform.OS === 'web') {
+        if (window.confirm(msg)) {
+          deleteStock(stock._id, token)
+            .then(() => {
+              setStocks((current) => current.filter((item) => item._id !== stock._id));
+            })
+            .catch((error) => {
+              if (error.status === 401) logout();
+              window.alert(error.message || 'Failed to delete stock.');
+            });
+        }
+        return;
+      }
+
       Alert.alert(
         'Delete stock',
-        `Remove ${stock.vegetableName || stock.name} from your listings?`,
+        msg,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -145,11 +182,7 @@ const StockListScreen = ({ navigation }) => {
   const renderStockCard = useCallback(
     ({ item }) => {
       const available = isAvailable(item);
-      const imageUri = item.imageUrl
-        ? imageUrlFor(item.imageUrl)
-        : item.image
-          ? imageUrlFor(item.image)
-          : null;
+      const imageUri = resolveStockImageUrl(item);
       const name = item.name || item.vegetableName;
       const riskLevel = String(item.spoilageRiskLevel || 'low').toLowerCase();
       const rc = riskColors[riskLevel] || riskColors.low;
@@ -272,11 +305,34 @@ const StockListScreen = ({ navigation }) => {
         placeholderTextColor="#9ca3af"
       />
 
+      <Text style={styles.sortLabel}>Sort</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.sortScroll}
+        contentContainerStyle={styles.sortChipRow}
+      >
+        {SORT_OPTIONS.map((opt) => {
+          const active = sortBy === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.sortChip, active && styles.sortChipActive]}
+              onPress={() => setSortBy(opt.key)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       <FlatList
         key={numCols}
-        data={filteredStocks}
+        data={sortedStocks}
         keyExtractor={(item) => item._id}
         numColumns={numCols}
+        extraData={sortBy}
         renderItem={renderStockCard}
         columnWrapperStyle={numCols > 1 ? styles.columnWrap : undefined}
         contentContainerStyle={styles.listContent}
@@ -331,6 +387,28 @@ const styles = StyleSheet.create({
     color: '#15803d',
     fontWeight: '900'
   },
+  sortLabel: {
+    paddingHorizontal: 16,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#166534',
+    textTransform: 'uppercase',
+    marginBottom: 6
+  },
+  sortScroll: { flexGrow: 0, marginBottom: 8 },
+  sortChipRow: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+  sortChip: {
+    marginRight: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#bbf7d0'
+  },
+  sortChipActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
+  sortChipText: { color: '#166534', fontWeight: '800', fontSize: 13 },
+  sortChipTextActive: { color: '#fff' },
   searchInput: {
     margin: 16,
     marginBottom: 8,

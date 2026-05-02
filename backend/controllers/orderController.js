@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const Stock = require('../models/Stock');
+const Delivery = require('../models/Delivery');
 const { notifyUser, notifyFarmersForOrder } = require('../utils/orderNotifications');
 
 const normalizeFarmerId = (f) => {
@@ -59,7 +60,7 @@ async function restoreDeductedStock(order) {
 // @access  Private Customer
 exports.createOrder = async (req, res) => {
   try {
-    const { customerName, items } = req.body;
+    const { customerName, items, deliveryAddress, note } = req.body;
     if (!customerName?.trim() || !items?.length) {
       return res.status(400).json({
         success: false,
@@ -90,12 +91,14 @@ exports.createOrder = async (req, res) => {
 
     const customerObjectId = req.user._id || req.user.id;
 
-const order = await Order.create({
+    const order = await Order.create({
       customerName: customerName.trim(),
       customerId: customerObjectId,
       items: normalizedItems,
       totalAmount,
-      status: 'PENDING'
+      status: 'PENDING',
+      deliveryAddress: (deliveryAddress || '').trim(),
+      note: (note || '').trim()
     });
 
     await notifyFarmersForOrder(order, {
@@ -659,7 +662,7 @@ exports.setOrderStatus = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+res.status(200).json({
       success: true,
       data: order,
       message: `Order status set to ${status}`,
@@ -667,5 +670,89 @@ exports.setOrderStatus = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Admin: Update order status (PATCH) - auto-creates Delivery when confirmed
+// @route   PATCH /api/orders/:id/status
+// @access  Private Admin
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Normalize to lowercase for consistent validation (frontend may send UPPERCASE)
+    const normalizedStatus = (status || '').toString().toLowerCase();
+    const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
+    if (!normalizedStatus || !validStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({ message: `Invalid status. Valid: ${validStatuses.join(', ')}` });
+    }
+
+    const oldStatus = order.status;
+    
+    // If cancelling, restore stock
+    if (normalizedStatus === 'cancelled' && oldStatus !== 'CANCELLED' && oldStatus !== 'cancelled') {
+      await restoreDeductedStock(order);
+    }
+
+    // Update order status (store as uppercase for DB consistency)
+    order.status = normalizedStatus.toUpperCase();
+    order.legacyStatus = normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+    await order.save();
+
+    // Auto-create Delivery record when status becomes 'confirmed'
+    if (normalizedStatus === 'confirmed' && oldStatus !== 'CONFIRMED' && oldStatus !== 'confirmed') {
+      const itemsList = (order.items || []).map(i => `${i.product} x ${i.quantity}kg`).join(', ');
+      await Delivery.create({
+        orderId: order._id,
+        customerName: order.customerName || 'Customer',
+        customerAddress: order.deliveryAddress || '',
+        items: itemsList,
+        amount: order.totalAmount,
+        status: 'Pending'
+      });
+    }
+
+    // Notify customer
+    if (order.customerId) {
+      await notifyUser(String(order.customerId), {
+        title: 'Order status updated',
+        body: `Order #${String(order._id).slice(-6).toUpperCase()} is now ${normalizedStatus}.`,
+        orderId: order._id,
+        type: 'order_status'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+      message: `Order status updated to ${normalizedStatus}`
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get all orders (admin only)
+// @route   GET /api/orders
+// @access  Private Admin
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate('customerId', 'name email')
+      .populate('farmerId', 'name email')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({ 
+      success: true, 
+      count: orders.length, 
+      data: orders 
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

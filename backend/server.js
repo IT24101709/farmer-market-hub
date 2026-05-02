@@ -14,6 +14,10 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// Serve uploads before helmet — Expo/React dev server is on another origin (:808x vs API port).
+// Helmet can set Cross-Origin-Resource-Policy in a way that blocks cross-origin <Image> thumbnails.
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Security Headers
 app.use(helmet());
 
@@ -39,9 +43,6 @@ const apiLimiter = rateLimit({
 // Apply rate limiting to all /api routes
 app.use('/api', apiLimiter);
 
-// Serve static fields for uploaded images
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const stockRoutes = require('./routes/stockRoutes');
@@ -53,6 +54,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const adminDeliveryRoutes = require('./routes/adminDeliveryRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stocks', stockRoutes);
@@ -64,6 +66,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/deliveries', deliveryRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // =======================
 // Global Error Handler (NFR-03)
@@ -200,7 +203,37 @@ connectDB()
       } = require('./utils/ensureCategories');
       await migrateLegacyStockCategories();
       await ensureDefaultCategories();
-      
+
+      const StockModel = require('./models/Stock');
+      try {
+        const indexes = await StockModel.collection.indexes();
+        const legacyUniqueNames = indexes
+          .filter((idx) => {
+            const key = idx?.key || {};
+            const hasFarmer = Object.prototype.hasOwnProperty.call(key, 'farmerId');
+            const hasHarvest = Object.prototype.hasOwnProperty.call(key, 'harvestDate');
+            const hasNameField =
+              Object.prototype.hasOwnProperty.call(key, 'name') ||
+              Object.prototype.hasOwnProperty.call(key, 'vegetableName');
+            return Boolean(idx?.unique && hasFarmer && hasHarvest && hasNameField);
+          })
+          .map((idx) => idx.name);
+
+        for (const idxName of legacyUniqueNames) {
+          await StockModel.collection.dropIndex(idxName);
+          console.log(`✅ Dropped legacy unique stock index: ${idxName}`);
+        }
+      } catch (idxErr) {
+        const msg = String(idxErr?.message || '');
+        if (
+          idxErr?.code !== 27 &&
+          !msg.includes('index not found') &&
+          !msg.includes('ns not found')
+        ) {
+          console.warn('Stock index cleanup:', idxErr.message);
+        }
+      }
+
       console.log('========================================');
       console.log('🎉 USERS READY:');
       console.log('Admin: admin@farmersmarket.com / admin123');
