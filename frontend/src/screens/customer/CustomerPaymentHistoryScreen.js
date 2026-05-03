@@ -98,7 +98,7 @@ const CustomerPaymentHistoryScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }
@@ -136,10 +136,10 @@ const CustomerPaymentHistoryScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   banner: {
-    backgroundColor: '#1d4ed8',
+    backgroundColor: '#15803d',
     padding: 20,
     alignItems: 'center',
     paddingBottom: 24
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   bannerAmount: { color: '#fff', fontSize: 32, fontWeight: '900' },
-  bannerCount: { color: '#bfdbfe', fontSize: 13, marginTop: 4 },
+  bannerCount: { color: '#bbf7d0', fontSize: 13, marginTop: 4 },
   list: { padding: 16, paddingBottom: 40 },
   card: {
     backgroundColor: '#fff',
@@ -161,14 +161,14 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   cardRow: { flexDirection: 'row', alignItems: 'center' },
   methodIconBox: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   methodIcon: { fontSize: 22 },
   cardMid: { flex: 1 },
   txRef: { fontWeight: '800', color: '#0f172a', fontSize: 14 },
-  orderRef: { color: '#0369a1', fontSize: 13, marginTop: 2 },
+  orderRef: { color: '#166534', fontSize: 13, marginTop: 2 },
   date: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
   cardRight: { alignItems: 'flex-end' },
   amount: { fontWeight: '900', color: '#0f172a', fontSize: 15 },

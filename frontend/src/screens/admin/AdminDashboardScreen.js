@@ -38,7 +38,7 @@ const AdminDashboardScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -89,7 +89,7 @@ const AdminDashboardScreen = ({ navigation }) => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminOrders')}>
           <Text style={styles.cardIcon}>🛒</Text>
-          <Text style={styles.cardTitle}>Manage Orders</Text>
+          <Text style={styles.cardTitle}>All Orders</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminReviews')}>
           <Text style={styles.cardIcon}>S5</Text>
@@ -127,9 +127,9 @@ const AdminDashboardScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   centered: { justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 20, backgroundColor: '#FF9800', borderBottomLeftRadius: 20, borderBottomRightRadius: 20, marginBottom: 20 },
+  header: { padding: 20, backgroundColor: '#166534', borderBottomLeftRadius: 20, borderBottomRightRadius: 20, marginBottom: 20 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#FFF', marginBottom: 5 },
   subtitle: { fontSize: 16, color: '#FFF' },
   summaryContainer: { paddingHorizontal: 20, marginBottom: 20 },
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     height: 110
   },
   cardIcon: { fontSize: 32, marginBottom: 8 },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#FF9800', textAlign: 'center' },
+  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#166534', textAlign: 'center' },
   logoutBtn: { marginHorizontal: 20, marginTop: 20, backgroundColor: '#F44336', padding: 15, borderRadius: 8, alignItems: 'center' },
   logoutText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });

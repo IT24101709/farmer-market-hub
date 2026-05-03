@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   cancelledText: { color: '#b91c1c', fontWeight: '800', fontSize: 16 },
   failedText: { color: '#b91c1c', fontWeight: '800', fontSize: 16 },
   infoBox: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#bbf7d0',
     padding: 14,
     borderRadius: 10,
     alignItems: 'center'

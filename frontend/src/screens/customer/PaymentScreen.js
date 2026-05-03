@@ -229,10 +229,10 @@ const PaymentScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   content: { padding: 18, paddingBottom: 40 },
   orderCard: {
-    backgroundColor: '#1d4ed8',
+    backgroundColor: '#15803d',
     borderRadius: 16,
     padding: 20,
     marginBottom: 28
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     marginBottom: 6
   },
   orderName: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 4 },
-  orderRef: { color: '#bfdbfe', fontSize: 13, marginBottom: 12 },
+  orderRef: { color: '#bbf7d0', fontSize: 13, marginBottom: 12 },
   orderTotal: { color: '#fff', fontSize: 32, fontWeight: '900' },
   sectionTitle: {
     color: '#374151',
@@ -267,21 +267,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between'
   },
-  methodCardActive: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
+  methodCardActive: { borderColor: '#15803d', backgroundColor: '#ecfdf5' },
   methodLabel: { fontSize: 15, fontWeight: '700', color: '#374151' },
-  methodLabelActive: { color: '#1d4ed8' },
+  methodLabelActive: { color: '#15803d' },
   checkCircle: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#15803d',
     alignItems: 'center',
     justifyContent: 'center'
   },
   checkMark: { color: '#fff', fontWeight: '900', fontSize: 14 },
   payBtn: {
     marginTop: 24,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#15803d',
     paddingVertical: 18,
     borderRadius: 14,
     alignItems: 'center'
@@ -293,11 +293,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center'
   },
-  skipBtnText: { color: '#2563eb', fontSize: 15, fontWeight: '700' },
+  skipBtnText: { color: '#15803d', fontSize: 15, fontWeight: '700' },
   noteBox: {
     marginTop: 16,
     padding: 14,
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#ecfdf5',
     borderRadius: 10,
     borderLeftWidth: 4,
     borderLeftColor: '#93c5fd'

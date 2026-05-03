@@ -147,20 +147,20 @@ const PlaceOrderScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   content: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 24, fontWeight: '900', color: '#0c4a6e', marginBottom: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e0f2fe' },
+  title: { fontSize: 24, fontWeight: '900', color: '#14532d', marginBottom: 20 },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#d1fae5' },
   productName: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  price: { fontSize: 18, fontWeight: '700', color: '#0369a1', marginTop: 6 },
+  price: { fontSize: 18, fontWeight: '700', color: '#166534', marginTop: 6 },
   stock: { fontSize: 14, color: '#64748b', marginTop: 4 },
   field: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 8 },
   input: { backgroundColor: '#fff', borderRadius: 10, padding: 14, fontSize: 16, borderWidth: 1, borderColor: '#d1d5db' },
   textArea: { height: 80, textAlignVertical: 'top' },
   error: { color: '#dc2626', fontSize: 12, marginTop: 4 },
-  total: { fontSize: 20, fontWeight: '900', color: '#0369a1', marginTop: 10 },
-  button: { backgroundColor: '#2196F3', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+  total: { fontSize: 20, fontWeight: '900', color: '#166534', marginTop: 10 },
+  button: { backgroundColor: '#15803d', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   buttonDisabled: { backgroundColor: '#94a3b8' },
   buttonText: { color: '#fff', fontWeight: '800', fontSize: 16 }
 });

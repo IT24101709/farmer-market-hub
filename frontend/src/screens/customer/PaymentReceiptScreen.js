@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   },
   homeBtn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#15803d',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center'

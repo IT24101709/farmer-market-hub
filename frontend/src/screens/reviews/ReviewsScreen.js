@@ -115,7 +115,7 @@ const ReviewsScreen = ({ route }) => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }
@@ -172,12 +172,12 @@ const ReviewsScreen = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f9ff' },
-  header: { padding: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0f2fe' },
-  title: { fontSize: 22, fontWeight: '900', color: '#0c4a6e' },
-  summary: { marginTop: 6, color: '#0369a1', fontWeight: '700' },
-  form: { margin: 14, padding: 14, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dbeafe' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0fdf4' },
+  header: { padding: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#d1fae5' },
+  title: { fontSize: 22, fontWeight: '900', color: '#14532d' },
+  summary: { marginTop: 6, color: '#166534', fontWeight: '700' },
+  form: { margin: 14, padding: 14, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#bbf7d0' },
   formTitle: { fontWeight: '900', color: '#0f172a', marginBottom: 10 },
   ratingRow: { flexDirection: 'row', marginBottom: 10 },
   starButton: { marginRight: 8 },
@@ -194,12 +194,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc'
   },
   actions: { flexDirection: 'row', marginTop: 12, gap: 10 },
-  submitButton: { flex: 1, backgroundColor: '#2563eb', paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
+  submitButton: { flex: 1, backgroundColor: '#15803d', paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
   submitText: { color: '#fff', fontWeight: '900' },
   deleteButton: { paddingHorizontal: 18, justifyContent: 'center', backgroundColor: '#fee2e2', borderRadius: 10 },
   deleteText: { color: '#991b1b', fontWeight: '900' },
   list: { padding: 14, paddingBottom: 40 },
-  reviewCard: { backgroundColor: '#fff', padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#e0f2fe' },
+  reviewCard: { backgroundColor: '#fff', padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#d1fae5' },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   customer: { fontWeight: '900', color: '#111827' },
   stars: { color: '#f59e0b', fontWeight: '900' },

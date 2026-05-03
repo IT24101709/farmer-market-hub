@@ -38,7 +38,7 @@ const LandingScreen = ({ navigation }) => {
 
   const renderProductPreview = () => {
     if (loading) {
-      return <ActivityIndicator size="large" color="#4CAF50" style={{ marginVertical: 30 }} />;
+      return <ActivityIndicator size="large" color="#15803d" style={{ marginVertical: 30 }} />;
     }
 
     if (products.length === 0) {
@@ -91,7 +91,10 @@ const LandingScreen = ({ navigation }) => {
         <View style={styles.heroSection}>
           <Text style={styles.heroTitle}>Fresh from Farm to Your Table</Text>
           <Text style={styles.heroSubtitle}>Connecting local farmers directly with buyers for the freshest, most affordable produce.</Text>
-          
+          <Text style={styles.heroAccountHint}>
+            New here? Create a free customer account (Sign Up), then sign in. Each person uses their own email—many customers are welcome.
+          </Text>
+
           <View style={styles.searchContainer}>
             <TextInput 
               style={styles.searchInput} 
@@ -228,7 +231,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navBtnPrimary: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
   },
   navBtnText: {
     color: '#333',
@@ -258,9 +261,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#388E3C',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 14,
     paddingHorizontal: 10,
     lineHeight: 24,
+  },
+  heroAccountHint: {
+    fontSize: 13,
+    color: '#546e57',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 14,
+    lineHeight: 20,
+    fontWeight: '500'
   },
   searchContainer: {
     flexDirection: 'row',
@@ -280,7 +292,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   searchBtn: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#166534',
     paddingHorizontal: 25,
     paddingVertical: 12,
     borderRadius: 8,
@@ -341,7 +353,7 @@ const styles = StyleSheet.create({
     color: '#212121',
   },
   viewAllText: {
-    color: '#2196F3',
+    color: '#15803d',
     fontWeight: 'bold',
     marginBottom: 3,
   },
@@ -379,7 +391,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#15803d',
     marginBottom: 4,
   },
   farmerName: {
@@ -416,7 +428,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   stepNumberText: {
-    color: '#4CAF50',
+    color: '#15803d',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -456,7 +468,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   ctaBtn: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#166534',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 30,

@@ -117,7 +117,7 @@ const PaymentHistoryScreen = () => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }

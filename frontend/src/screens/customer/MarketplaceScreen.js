@@ -109,7 +109,7 @@ const MarketplaceScreen = ({ navigation }) => {
     if (!hasMore) return null;
     return (
       <View style={{ paddingVertical: 20 }}>
-        <ActivityIndicator size="small" color="#4CAF50" />
+        <ActivityIndicator size="small" color="#15803d" />
       </View>
     );
   };
@@ -237,7 +237,7 @@ const MarketplaceScreen = ({ navigation }) => {
                 <Text style={styles.adminBtnText}>✏️ Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.adminEditBtn, { backgroundColor: '#f59e0b' }]}
+                style={[styles.adminEditBtn, { backgroundColor: '#166534' }]}
                 onPress={() => handleAdminDeactivate(item._id)}
               >
                 <Text style={styles.adminBtnText}>🚫 Deactivate</Text>
@@ -332,7 +332,7 @@ const MarketplaceScreen = ({ navigation }) => {
         </View>
       ) : loading && page === 1 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color="#15803d" />
         </View>
       ) : products.length === 0 ? (
         <View style={styles.centered}>
@@ -344,7 +344,7 @@ const MarketplaceScreen = ({ navigation }) => {
           renderItem={renderProduct}
           keyExtractor={(item) => item._id}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4CAF50']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#15803d']} />
           }
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
@@ -359,7 +359,7 @@ const MarketplaceScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f0fdf4',
   },
   header: {
     flexDirection: 'row',
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     fontWeight: '900'
   },
   cartBtn: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   searchInput: {
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f0fdf4',
     borderRadius: 10,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f0fdf4',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
   priceTag: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#15803d',
   },
   infoRow: {
     flexDirection: 'row',
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   infoValueBadge: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#dcfce7',
     color: '#1976D2',
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     color: '#E65100',
   },
   buyButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   reviewButton: {
     marginTop: 10,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#dcfce7',
     borderRadius: 8,
     paddingVertical: 11,
     alignItems: 'center',
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   },
   adminEditBtn: {
     flex: 1,
-    backgroundColor: '#0284c7',
+    backgroundColor: '#059669',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center'

@@ -28,7 +28,7 @@ const formatDate = (d) => {
 const statusColor = (status) => {
   switch (status) {
     case 'Pending': return '#ca8a04';
-    case 'In Transit': return '#2563eb';
+    case 'In Transit': return '#15803d';
     case 'Delivered': return '#15803d';
     case 'Cancelled': return '#b91c1c';
     default: return '#64748b';
@@ -117,7 +117,7 @@ const DeliveryHistoryScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading history...</Text>
       </View>
     );
@@ -147,9 +147,9 @@ const DeliveryHistoryScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
-  loadingText: { marginTop: 10, color: '#0369a1', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  loadingText: { marginTop: 10, color: '#166534', fontWeight: '700' },
   list: { padding: 16, paddingBottom: 40 },
   dayCard: {
     backgroundColor: '#fff',
@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
-  dayHeader: { fontSize: 16, fontWeight: '800', color: '#0c4a6e', marginBottom: 4 },
+  dayHeader: { fontSize: 16, fontWeight: '800', color: '#14532d', marginBottom: 4 },
   dayStats: { fontSize: 14, color: '#64748b', marginBottom: 12 },
   deliveryItem: {
     flexDirection: 'row',
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f0f9ff'
+    borderTopColor: '#f0fdf4'
   },
   deliveryLeft: { flex: 1 },
   orderRef: { fontSize: 14, fontWeight: '700', color: '#333' },

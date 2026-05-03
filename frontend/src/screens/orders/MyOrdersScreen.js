@@ -17,11 +17,11 @@ const statusColors = {
   PENDING: '#ca8a04',
   CONFIRMED: '#15803d',
   CANCELLED: '#b91c1c',
-  DELIVERED: '#2563eb',
+  DELIVERED: '#15803d',
   Pending: '#ca8a04',
   Confirmed: '#15803d',
   Cancelled: '#b91c1c',
-  Delivered: '#2563eb'
+  Delivered: '#15803d'
 };
 
 const getStatusColor = (status) => statusColors[status] || '#64748b';
@@ -110,7 +110,7 @@ const MyOrdersScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading orders...</Text>
       </View>
     );
@@ -140,9 +140,9 @@ const MyOrdersScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
-  loadingText: { marginTop: 10, color: '#0369a1', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  loadingText: { marginTop: 10, color: '#166534', fontWeight: '700' },
   list: { padding: 16, paddingBottom: 40 },
   card: {
     backgroundColor: '#fff',
@@ -150,14 +150,14 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderRef: { fontSize: 16, fontWeight: '900', color: '#0c4a6e' },
+  orderRef: { fontSize: 16, fontWeight: '900', color: '#14532d' },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusText: { fontWeight: '800', fontSize: 12 },
   items: { marginTop: 10, color: '#374151', fontWeight: '600' },
-  total: { marginTop: 10, fontSize: 20, fontWeight: '900', color: '#0369a1' },
+  total: { marginTop: 10, fontSize: 20, fontWeight: '900', color: '#166534' },
   date: { marginTop: 6, color: '#64748b', fontWeight: '600', fontSize: 13 },
   empty: { textAlign: 'center', color: '#64748b', marginTop: 40, fontWeight: '600', paddingHorizontal: 24 }
 });

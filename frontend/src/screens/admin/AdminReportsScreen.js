@@ -131,7 +131,7 @@ const AdminReportsScreen = () => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -244,8 +244,8 @@ const styles = StyleSheet.create({
   userName: { color: '#111827', fontWeight: '900' },
   userMeta: { color: '#64748b', fontSize: 12, fontWeight: '700', marginTop: 2 },
   userStatus: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14 },
-  userButton: { backgroundColor: '#e0f2fe', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
-  userButtonText: { color: '#0369a1', fontWeight: '900', fontSize: 12 },
+  userButton: { backgroundColor: '#d1fae5', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+  userButtonText: { color: '#166534', fontWeight: '900', fontSize: 12 },
   empty: { color: '#64748b', fontWeight: '700', marginTop: 8 },
   disabled: { opacity: 0.6 }
 });

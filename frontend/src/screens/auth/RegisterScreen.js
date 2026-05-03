@@ -86,10 +86,16 @@ const RegisterScreen = ({ navigation }) => {
       
       const result = await register(name, email, password, role, { businessName, phone, address });
       console.log('✅ Registration result:', result);
-      
+
+      // Customers receive a token immediately: session is stored and the app switches to the customer home.
+      // Avoid follow-up UI on the auth screen (it unmounts) and prevent setState-after-unmount noise.
+      if (role === 'Customer' && (result?.accessToken || result?.token)) {
+        return;
+      }
+
       setRegistrationData(result);
       setRegistrationComplete(true);
-      
+
       if (role === 'Farmer' && !result.isApproved) {
         console.log('🚜 Farmer account pending approval');
         Alert.alert('✅ Registration Successful!', 'Your farmer account is created and pending admin approval.\nYou can try logging in once approved.', [
@@ -214,6 +220,10 @@ const RegisterScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Join Our Community</Text>
         <Text style={styles.subtitle}>Choose your role to get started</Text>
+        <Text style={styles.informationalText}>
+          Every customer (and farmer) has their own account. Use a unique email for each person; many
+          customers can register and sign in on their own devices with their own credentials.
+        </Text>
 
         {/* Role Selection */}
         <View style={styles.roleContainer}>
@@ -399,7 +409,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
+  },
+  informationalText: {
+    fontSize: 13,
+    color: '#4b5563',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+    paddingHorizontal: 4
   },
   roleContainer: {
     flexDirection: 'row',
@@ -418,7 +436,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   roleCardActive: {
-    borderColor: '#4CAF50',
+    borderColor: '#15803d',
     backgroundColor: '#f1f8f4',
   },
   roleEmoji: {
@@ -432,7 +450,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   roleTitleActive: {
-    color: '#4CAF50',
+    color: '#15803d',
   },
   roleDescription: {
     fontSize: 12,
@@ -467,7 +485,7 @@ const styles = StyleSheet.create({
   infoBox: {
     backgroundColor: '#e8f5e9',
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#15803d',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -478,7 +496,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   registerBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -500,7 +518,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   linkHighlight: {
-    color: '#4CAF50',
+    color: '#15803d',
     fontWeight: '600',
   },
   // Success/Completion screen styles
@@ -586,7 +604,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -596,14 +614,14 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#15803d',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 8,
   },
   secondaryBtnText: {
-    color: '#4CAF50',
+    color: '#15803d',
     fontSize: 14,
     fontWeight: '600',
   },

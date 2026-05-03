@@ -90,7 +90,7 @@ const StockDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }
@@ -205,7 +205,7 @@ const StockDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA'
+    backgroundColor: '#f0fdf4'
   },
   centered: {
     flex: 1,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     marginTop: -20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    backgroundColor: '#F5F7FA'
+    backgroundColor: '#f0fdf4'
   },
   headerInfo: {
     flexDirection: 'row',
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   detailValuePrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50'
+    color: '#15803d'
   },
   divider: {
     height: 1,
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: '#E8F5E9',
     borderWidth: 1,
-    borderColor: '#4CAF50'
+    borderColor: '#15803d'
   },
   editButtonText: {
     color: '#2E7D32',

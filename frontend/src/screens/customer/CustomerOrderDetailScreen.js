@@ -96,7 +96,7 @@ const CustomerOrderDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }
@@ -184,11 +184,11 @@ const CustomerOrderDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   content: { padding: 18, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
-  title: { fontSize: 22, fontWeight: '900', color: '#0c4a6e' },
-  status: { marginTop: 8, fontSize: 18, fontWeight: '800', color: '#0369a1' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  title: { fontSize: 22, fontWeight: '900', color: '#14532d' },
+  status: { marginTop: 8, fontSize: 18, fontWeight: '800', color: '#166534' },
   meta: { marginTop: 6, color: '#64748b', fontWeight: '600' },
   section: {
     marginTop: 18,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   sectionTitle: { fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 10, textTransform: 'uppercase' },
   trackRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
@@ -207,13 +207,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
     marginRight: 10
   },
-  dotDone: { backgroundColor: '#2196F3' },
+  dotDone: { backgroundColor: '#15803d' },
   trackLabel: { color: '#94a3b8', fontWeight: '600' },
   trackLabelDone: { color: '#0f172a', fontWeight: '700' },
   line: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   product: { fontWeight: '800', color: '#111827' },
   lineMeta: { marginTop: 4, color: '#64748b', fontSize: 13, fontWeight: '600' },
-  grand: { marginTop: 12, fontWeight: '900', fontSize: 18, color: '#0369a1' },
+  grand: { marginTop: 12, fontWeight: '900', fontSize: 18, color: '#166534' },
   cancelBtn: {
     marginTop: 24,
     backgroundColor: '#fee2e2',
@@ -226,17 +226,17 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: '#991b1b', fontWeight: '900' },
   trackBtn: {
     marginTop: 18,
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#bbf7d0',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#bfdbfe'
+    borderColor: '#bbf7d0'
   },
-  trackBtnText: { color: '#1d4ed8', fontWeight: '900' },
+  trackBtnText: { color: '#15803d', fontWeight: '900' },
   disabled: { opacity: 0.6 },
   muted: { color: '#64748b', fontWeight: '600' },
-  btn: { marginTop: 16, backgroundColor: '#2196F3', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  btn: { marginTop: 16, backgroundColor: '#15803d', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   btnText: { color: '#fff', fontWeight: '800' }
 });
 

@@ -17,8 +17,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', screen: 'FarmerDashboard' },
   { label: 'Add Stock', screen: 'AddStock' },
   { label: 'View Stock', screen: 'StockList' },
-  { label: 'AI Demand', screen: 'BulkOperations' },
-  { label: 'Financial Report', screen: 'PaymentHistory' },
+  { label: 'Payment Details', screen: 'PaymentHistory' },
   { label: 'Orders', screen: 'MyOrders' },
   { label: 'Profile', screen: 'FarmerProfile' }
 ];

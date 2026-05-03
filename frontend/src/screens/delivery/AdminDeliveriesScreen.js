@@ -16,8 +16,8 @@ import { getAllDeliveries, assignAgent, getDeliveryAgents } from '../../services
 
 const statusColors = {
   pending: '#ca8a04',
-  assigned: '#7c3aed',
-  'in-transit': '#2563eb',
+  assigned: '#047857',
+  'in-transit': '#15803d',
   delivered: '#15803d',
   cancelled: '#b91c1c'
 };
@@ -163,7 +163,7 @@ const AdminDeliveriesScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     borderColor: '#ffe0b2',
     marginRight: 8
   },
-  filterChipActive: { backgroundColor: '#FF9800', borderColor: '#FF9800' },
+  filterChipActive: { backgroundColor: '#166534', borderColor: '#166534' },
   filterText: { color: '#757575', fontWeight: '600', fontSize: 13, textTransform: 'capitalize' },
   filterTextActive: { color: '#fff' },
   list: { paddingHorizontal: 12, paddingBottom: 32 },

@@ -154,7 +154,8 @@ const [usePhone, setUsePhone] = useState(false);
             Farmers: Your account requires admin approval after registration. Check your email for updates.
           </Text>
           <Text style={styles.infoText}>
-            Customers: Instant access! Register and start shopping.
+            Customers: Create your own account with your email, then sign in. Any number of customers can
+            use the system; each person uses a separate email and password.
           </Text>
         </View>
       </ScrollView>
@@ -174,7 +175,7 @@ const [usePhone, setUsePhone] = useState(false);
               <Text style={styles.modalText}>
                 Your farmer account is awaiting admin approval. Once approved, you'll be able to login with your credentials.
               </Text>
-              <Text style={styles.modalText} style={{ marginTop: 12 }}>
+              <Text style={[styles.modalText, { marginTop: 12 }]}>
                 You will receive an email notification once your account has been reviewed and approved.
               </Text>
             </View>
@@ -205,17 +206,17 @@ const [usePhone, setUsePhone] = useState(false);
 
   const styles = StyleSheet.create({
     toggleBtn: {
-      backgroundColor: '#e3f2fd',
+      backgroundColor: '#ecfdf5',
       paddingVertical: 12,
       paddingHorizontal: 16,
       borderRadius: 8,
       alignItems: 'center',
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: '#2196f3',
+      borderColor: '#15803d',
     },
     toggleBtnText: {
-      color: '#1976d2',
+      color: '#166534',
       fontWeight: '600',
       fontSize: 14,
     },
@@ -275,7 +276,7 @@ const [usePhone, setUsePhone] = useState(false);
     color: '#333',
   },
   loginBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -307,20 +308,20 @@ const [usePhone, setUsePhone] = useState(false);
   },
   registerLink: {
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#15803d',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   registerLinkText: {
-    color: '#4CAF50',
+    color: '#15803d',
     fontSize: 14,
     fontWeight: '600',
   },
   infoBox: {
     backgroundColor: '#e8f5e9',
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#15803d',
     borderRadius: 8,
     padding: 12,
   },
@@ -387,7 +388,7 @@ const [usePhone, setUsePhone] = useState(false);
     lineHeight: 16,
   },
   modalBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',

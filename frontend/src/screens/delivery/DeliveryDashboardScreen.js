@@ -16,8 +16,8 @@ import { getMyDeliveries } from '../../services/deliveryService';
 
 const statusColors = {
   pending: '#ca8a04',
-  assigned: '#7c3aed',
-  'in-transit': '#2563eb',
+  assigned: '#047857',
+  'in-transit': '#15803d',
   delivered: '#15803d',
   cancelled: '#b91c1c'
 };
@@ -99,7 +99,7 @@ const DeliveryDashboardScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading deliveries...</Text>
       </View>
     );
@@ -109,11 +109,11 @@ const DeliveryDashboardScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.statsContainer}>
         <View style={styles.statBox}>
-          <Text style={[styles.statNumber, { color: '#7c3aed' }]}>{stats.assigned || 0}</Text>
+          <Text style={[styles.statNumber, { color: '#047857' }]}>{stats.assigned || 0}</Text>
           <Text style={styles.statLabel}>Assigned</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statNumber, { color: '#2563eb' }]}>{stats['in-transit'] || 0}</Text>
+          <Text style={[styles.statNumber, { color: '#15803d' }]}>{stats['in-transit'] || 0}</Text>
           <Text style={styles.statLabel}>In Transit</Text>
         </View>
         <View style={styles.statBox}>
@@ -145,15 +145,15 @@ const DeliveryDashboardScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
-  loadingText: { marginTop: 10, color: '#0369a1', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  loadingText: { marginTop: 10, color: '#166534', fontWeight: '700' },
   statsContainer: {
     flexDirection: 'row',
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0f2fe'
+    borderBottomColor: '#d1fae5'
   },
   statBox: { flex: 1, alignItems: 'center' },
   statNumber: { fontSize: 28, fontWeight: '900' },
@@ -165,13 +165,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  deliveryId: { fontSize: 16, fontWeight: '900', color: '#0c4a6e' },
+  deliveryId: { fontSize: 16, fontWeight: '900', color: '#14532d' },
   statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusText: { fontWeight: '800', fontSize: 12, textTransform: 'capitalize' },
-  orderRef: { marginTop: 8, fontSize: 14, color: '#0369a1', fontWeight: '600' },
+  orderRef: { marginTop: 8, fontSize: 14, color: '#166534', fontWeight: '600' },
   address: { marginTop: 6, fontSize: 14, color: '#64748b' },
   date: { marginTop: 6, color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },

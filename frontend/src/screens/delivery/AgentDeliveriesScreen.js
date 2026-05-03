@@ -15,8 +15,8 @@ import { getMyDeliveries } from '../../services/deliveryService';
 
 const statusColors = {
   pending: '#ca8a04',
-  assigned: '#7c3aed',
-  'in-transit': '#2563eb',
+  assigned: '#047857',
+  'in-transit': '#15803d',
   delivered: '#15803d',
   cancelled: '#b91c1c'
 };
@@ -129,7 +129,7 @@ const AgentDeliveriesScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }
@@ -156,7 +156,7 @@ const AgentDeliveriesScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, paddingBottom: 40 },
   card: {
@@ -165,13 +165,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  deliveryId: { fontSize: 16, fontWeight: '900', color: '#0c4a6e' },
+  deliveryId: { fontSize: 16, fontWeight: '900', color: '#14532d' },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusText: { fontWeight: '800', fontSize: 12, textTransform: 'capitalize' },
-  orderRef: { marginTop: 8, fontSize: 14, color: '#0369a1', fontWeight: '600' },
+  orderRef: { marginTop: 8, fontSize: 14, color: '#166534', fontWeight: '600' },
   address: { marginTop: 8, color: '#64748b', fontSize: 14 },
   date: { marginTop: 6, color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   actionBtn: {

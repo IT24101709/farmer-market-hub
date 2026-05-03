@@ -21,15 +21,14 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
 import { getCategories } from '../services/categoryService';
-import { createStock } from '../services/stockService';
+import { bulkAddStocks, createStock } from '../services/stockService';
 import { resolveStockCategorySlug } from '../utils/stockCategory';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', screen: 'FarmerDashboard' },
   { label: 'Add Stock', screen: 'AddStock' },
   { label: 'View Stock', screen: 'StockList' },
-  { label: 'AI Demand', screen: 'BulkOperations' },
-  { label: 'Financial Report', screen: 'PaymentHistory' },
+  { label: 'Payment Details', screen: 'PaymentHistory' },
   { label: 'Orders', screen: 'MyOrders' },
   { label: 'Profile', screen: 'FarmerProfile' }
 ];
@@ -143,6 +142,10 @@ const AddStockScreen = ({ navigation }) => {
   const [image, setImage] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkRows, setBulkRows] = useState([
+    { id: 1, categoryId: null, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '' }
+  ]);
   const [showHarvestPicker, setShowHarvestPicker] = useState(false);
 
   const isWide = width >= 780;
@@ -329,6 +332,71 @@ const AddStockScreen = ({ navigation }) => {
       showToast('Error', error.message || error.error || 'Failed to add stock.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const addBulkRow = () => {
+    const newId = bulkRows.length > 0 ? Math.max(...bulkRows.map((r) => r.id)) + 1 : 1;
+    setBulkRows((prev) => [
+      ...prev,
+      { id: newId, categoryId: null, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '' }
+    ]);
+  };
+
+  const removeBulkRow = (id) => {
+    if (bulkRows.length === 1) {
+      showToast('Bulk add', 'Keep at least one row, or use the single-item form above.');
+      return;
+    }
+    setBulkRows((prev) => prev.filter((row) => row.id !== id));
+  };
+
+  const updateBulkRow = (id, field, value) => {
+    setBulkRows((prev) => prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
+  };
+
+  const submitBulk = async (accessTokenOverride = null, didRefresh = false) => {
+    const authToken = accessTokenOverride || token;
+    if (!authToken) {
+      showToast('Session', 'Please sign in again to add stock.');
+      return;
+    }
+
+    const validStocks = [];
+    for (let i = 0; i < bulkRows.length; i++) {
+      const row = bulkRows[i];
+      if (!row.vegetableName?.trim() || !row.quantity || !row.pricePerKg || !row.expiryDate) {
+        showToast('Validation', `Fill name, quantity, price, and expiry in bulk row ${i + 1}.`);
+        return;
+      }
+      const cat = row.categoryId ? categories.find((c) => c._id === row.categoryId) : null;
+      validStocks.push({
+        categoryId: row.categoryId || undefined,
+        category: resolveStockCategorySlug(cat),
+        name: row.vegetableName.trim(),
+        quantity: Number(row.quantity),
+        pricePerKg: Number(row.pricePerKg),
+        expiryDate: row.expiryDate
+      });
+    }
+
+    try {
+      setBulkLoading(true);
+      await bulkAddStocks(validStocks, authToken);
+      showToast('Success', `Added ${validStocks.length} items.`);
+      setBulkRows([
+        { id: Date.now(), categoryId: null, vegetableName: '', quantity: '', pricePerKg: '', expiryDate: '' }
+      ]);
+      navigation.navigate('StockList');
+    } catch (error) {
+      if (error.status === 401 && !didRefresh) {
+        const newToken = await refreshSession();
+        if (newToken) return submitBulk(newToken, true);
+      }
+      if (error.status === 401) await logout();
+      showToast('Error', error.message || 'Bulk add failed.');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -539,14 +607,123 @@ const AddStockScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.buttonRow}>
-                <TouchableOpacity style={[styles.saveButton, loading && styles.disabled]} onPress={() => submitStock(false)} disabled={loading}>
+                <TouchableOpacity
+                  style={[styles.saveButton, (loading || bulkLoading) && styles.disabled]}
+                  onPress={() => submitStock(false)}
+                  disabled={loading || bulkLoading}
+                >
                   {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>SAVE & ADD ANOTHER</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.closeButton, loading && styles.disabled]} onPress={() => submitStock(true)} disabled={loading}>
+                <TouchableOpacity
+                  style={[styles.closeButton, (loading || bulkLoading) && styles.disabled]}
+                  onPress={() => submitStock(true)}
+                  disabled={loading || bulkLoading}
+                >
                   <Text style={styles.buttonText}>SAVE & CLOSE</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()} disabled={loading}>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()} disabled={loading || bulkLoading}>
                   <Text style={styles.buttonText}>CANCEL</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.bulkSection}>
+                <Text style={styles.bulkSectionTitle}>Add multiple at once (bulk)</Text>
+                <Text style={styles.bulkHint}>
+                  One row per vegetable. Expiry must be YYYY-MM-DD. Category is optional. Uses the same API as quick bulk entry — no photo per row (default image applies).
+                </Text>
+
+                {bulkRows.map((row, index) => (
+                  <View key={row.id} style={styles.bulkRowCard}>
+                    <View style={styles.bulkRowHeader}>
+                      <Text style={styles.bulkRowTitle}>Bulk item {index + 1}</Text>
+                      <TouchableOpacity onPress={() => removeBulkRow(row.id)} disabled={bulkLoading}>
+                        <Text style={styles.bulkRemoveIcon}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {categories.length > 0 ? (
+                      <View style={styles.bulkCategoryBlock}>
+                        <Text style={styles.bulkCategoryLabel}>Category (optional)</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bulkCategoryScroll}>
+                          {categories.map((cat) => (
+                            <TouchableOpacity
+                              key={cat._id}
+                              style={[
+                                styles.bulkChip,
+                                row.categoryId === cat._id && styles.bulkChipActive
+                              ]}
+                              onPress={() =>
+                                updateBulkRow(row.id, 'categoryId', row.categoryId === cat._id ? null : cat._id)
+                              }
+                              disabled={bulkLoading}
+                            >
+                              <Text
+                                style={[
+                                  styles.bulkChipText,
+                                  row.categoryId === cat._id && styles.bulkChipTextActive
+                                ]}
+                              >
+                                {cat.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    ) : null}
+
+                    <TextInput
+                      style={[styles.input, styles.bulkField]}
+                      placeholder="Vegetable name *"
+                      value={row.vegetableName}
+                      onChangeText={(val) => updateBulkRow(row.id, 'vegetableName', val)}
+                      editable={!bulkLoading}
+                    />
+                    <View style={styles.bulkInputRow}>
+                      <TextInput
+                        style={[styles.input, styles.bulkHalf]}
+                        placeholder="Qty (kg) *"
+                        keyboardType="decimal-pad"
+                        value={row.quantity}
+                        onChangeText={(val) => updateBulkRow(row.id, 'quantity', sanitizeQuantityInput(val))}
+                        editable={!bulkLoading}
+                      />
+                      <TextInput
+                        style={[styles.input, styles.bulkHalf]}
+                        placeholder="Price/kg *"
+                        keyboardType="decimal-pad"
+                        value={row.pricePerKg}
+                        onChangeText={(val) => updateBulkRow(row.id, 'pricePerKg', sanitizePriceInput(val))}
+                        editable={!bulkLoading}
+                      />
+                    </View>
+                    <TextInput
+                      style={[styles.input, styles.bulkField]}
+                      placeholder="Expiry date YYYY-MM-DD *"
+                      value={row.expiryDate}
+                      onChangeText={(val) => updateBulkRow(row.id, 'expiryDate', val)}
+                      editable={!bulkLoading}
+                    />
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={styles.bulkAddRowBtn}
+                  onPress={addBulkRow}
+                  disabled={bulkLoading}
+                >
+                  <Text style={styles.bulkAddRowText}>+ Add bulk row</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.bulkSubmitBtn, bulkLoading && styles.disabled]}
+                  onPress={() => submitBulk()}
+                  disabled={bulkLoading || loading}
+                >
+                  {bulkLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>SUBMIT BULK ({bulkRows.length})</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -760,7 +937,76 @@ const styles = StyleSheet.create({
   closeButton: { backgroundColor: '#16a34a', borderRadius: 8, paddingHorizontal: 22, paddingVertical: 14 },
   cancelButton: { marginLeft: 'auto', backgroundColor: '#e11d48', borderRadius: 8, paddingHorizontal: 22, paddingVertical: 14 },
   disabled: { opacity: 0.65 },
-  buttonText: { color: '#fff', fontWeight: '900' }
+  buttonText: { color: '#fff', fontWeight: '900' },
+  bulkSection: {
+    marginTop: 36,
+    paddingTop: 28,
+    borderTopWidth: 2,
+    borderTopColor: 'rgba(21, 128, 61, 0.25)'
+  },
+  bulkSectionTitle: {
+    color: '#15803d',
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  bulkHint: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  bulkRowCard: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 16,
+    marginBottom: 14
+  },
+  bulkRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  bulkRowTitle: { color: '#374151', fontWeight: '900', fontSize: 15 },
+  bulkRemoveIcon: { color: '#dc2626', fontSize: 18, fontWeight: '900', paddingHorizontal: 8 },
+  bulkCategoryBlock: { marginBottom: 12 },
+  bulkCategoryLabel: { fontSize: 12, color: '#64748b', fontWeight: '700', marginBottom: 6 },
+  bulkCategoryScroll: { flexGrow: 0 },
+  bulkChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    marginRight: 8
+  },
+  bulkChipActive: { backgroundColor: '#15803d' },
+  bulkChipText: { color: '#475569', fontSize: 12, fontWeight: '700' },
+  bulkChipTextActive: { color: '#fff' },
+  bulkField: { marginBottom: 10 },
+  bulkInputRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  bulkHalf: { flex: 1, minWidth: 120 },
+  bulkAddRowBtn: {
+    borderWidth: 1,
+    borderColor: '#15803d',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 14
+  },
+  bulkAddRowText: { color: '#15803d', fontWeight: '900', fontSize: 15 },
+  bulkSubmitBtn: {
+    backgroundColor: '#0f766e',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center'
+  }
 });
 
 export default AddStockScreen;

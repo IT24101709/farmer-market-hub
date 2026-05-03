@@ -98,7 +98,7 @@ const PaymentDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }

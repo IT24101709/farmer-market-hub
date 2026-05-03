@@ -233,14 +233,14 @@ const CartScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
 
   // Empty
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   emptyIcon: { fontSize: 64, marginBottom: 12 },
   emptyText: { fontSize: 18, color: '#757575', marginBottom: 20, fontWeight: '600' },
   shopBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 10,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   shopBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   historyBtn: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   qtyBtnText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#212121' },
-  itemTotal: { flex: 1, fontSize: 14, fontWeight: '700', color: '#4CAF50', textAlign: 'right' },
+  itemTotal: { flex: 1, fontSize: 14, fontWeight: '700', color: '#15803d', textAlign: 'right' },
   removeBtn: {
     marginLeft: 10,
     backgroundColor: '#FFEBEE',
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   footerTotalLabel: { fontSize: 16, color: '#757575', fontWeight: '600' },
   footerTotalValue: { fontSize: 20, fontWeight: '900', color: '#2E7D32' },
   checkoutBtn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#15803d',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center'

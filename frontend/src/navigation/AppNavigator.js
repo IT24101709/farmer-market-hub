@@ -4,7 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, AuthContext } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { NotificationProvider } from '../context/NotificationContext';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AppFooter from '../components/AppFooter';
+import theme from '../theme';
 
 // Screens
 import StockListScreen from '../screens/StockListScreen';
@@ -19,7 +21,6 @@ import ManageFarmersScreen from '../screens/admin/ManageFarmersScreen';
 import ManageCategoriesScreen from '../screens/admin/ManageCategoriesScreen';
 import FarmerDashboardScreen from '../screens/farmer/FarmerDashboardScreen';
 import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
-import BulkOperationsScreen from '../screens/farmer/BulkOperationsScreen';
 import MyOrdersScreen from '../screens/farmer/MyOrdersScreen';
 import OrderDetailsScreen from '../screens/farmer/OrderDetailsScreen';
 import PaymentHistoryScreen from '../screens/farmer/PaymentHistoryScreen';
@@ -28,7 +29,6 @@ import CartScreen from '../screens/customer/CartScreen';
 import CustomerOrdersScreen from '../screens/customer/CustomerOrdersScreen';
 import CustomerOrderDetailScreen from '../screens/customer/CustomerOrderDetailScreen';
 import LandingScreen from '../screens/public/LandingScreen';
-import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
 import AdminOrderDetailScreen from '../screens/admin/AdminOrderDetailScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import DeliveryDashboardScreen from '../screens/delivery/DeliveryDashboardScreen';
@@ -54,11 +54,23 @@ import ReviewsScreen from '../screens/reviews/ReviewsScreen';
 
 const Stack = createNativeStackNavigator();
 
+/** Admin stack: jump back to dashboard from order flows */
+const adminDashboardHeaderButton = (navigation) => (
+  <TouchableOpacity
+    onPress={() => navigation.navigate('AdminDashboard')}
+    style={{ marginRight: 12, paddingVertical: 6, paddingHorizontal: 4 }}
+    accessibilityRole="button"
+    accessibilityLabel="Open admin dashboard"
+  >
+    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Dashboard</Text>
+  </TouchableOpacity>
+);
+
 const FarmerStack = () => (
   <Stack.Navigator 
     initialRouteName="FarmerDashboard"
     screenOptions={{
-      headerStyle: { backgroundColor: '#4CAF50' },
+      headerStyle: { backgroundColor: theme.header },
       headerTintColor: '#fff',
       headerTitleStyle: { fontWeight: 'bold' }
     }}
@@ -69,12 +81,11 @@ const FarmerStack = () => (
     <Stack.Screen name="StockDetail" component={StockDetailScreen} options={{ title: 'Stock Details' }} />
     <Stack.Screen name="EditStock" component={EditStockScreen} options={{ title: 'Edit Stock' }} />
     <Stack.Screen name="FarmerProfile" component={FarmerProfileScreen} options={{ title: 'My Profile' }} />
-    <Stack.Screen name="BulkOperations" component={BulkOperationsScreen} options={{ title: 'Bulk Operations' }} />
     <Stack.Screen name="MyOrders" component={MyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Reviews' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
-    <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Payments' }} />
+    <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Payment Details' }} />
   </Stack.Navigator>
 );
 
@@ -82,7 +93,7 @@ const AdminStack = () => (
   <Stack.Navigator
     initialRouteName="AdminDashboard"
     screenOptions={{
-      headerStyle: { backgroundColor: '#FF9800' },
+      headerStyle: { backgroundColor: theme.header },
       headerTintColor: '#fff',
       headerTitleStyle: { fontWeight: 'bold' }
     }}
@@ -91,8 +102,22 @@ const AdminStack = () => (
     <Stack.Screen name="FarmerApproval" component={FarmerApprovalScreen} options={{ title: 'Pending Approvals' }} />
     <Stack.Screen name="ManageFarmers" component={ManageFarmersScreen} options={{ title: 'Manage Farmers' }} />
     <Stack.Screen name="ManageCategories" component={ManageCategoriesScreen} options={{ title: 'Manage Categories' }} />
-    <Stack.Screen name="AdminOrders" component={AdminOrdersScreenFixed} options={{ title: 'All Orders' }} />
-    <Stack.Screen name="AdminOrderDetail" component={AdminOrderDetailScreen} options={{ title: 'Order' }} />
+    <Stack.Screen
+      name="AdminOrders"
+      component={AdminOrdersScreenFixed}
+      options={({ navigation }) => ({
+        title: 'All Orders',
+        headerRight: () => adminDashboardHeaderButton(navigation)
+      })}
+    />
+    <Stack.Screen
+      name="AdminOrderDetail"
+      component={AdminOrderDetailScreen}
+      options={({ navigation }) => ({
+        title: 'Order',
+        headerRight: () => adminDashboardHeaderButton(navigation)
+      })}
+    />
     <Stack.Screen name="AdminDeliveries" component={AdminDeliveriesScreen} options={{ title: 'Deliveries' }} />
     <Stack.Screen name="DeliveryDetail" component={DeliveryDetailScreen} options={{ title: 'Delivery Details' }} />
     <Stack.Screen name="AdminPayments" component={AdminPaymentScreen} options={{ title: 'Payments' }} />
@@ -110,7 +135,7 @@ const DeliveryAgentStack = () => (
   <Stack.Navigator
     initialRouteName="DeliveryDashboard"
     screenOptions={{
-      headerStyle: { backgroundColor: '#7c3aed' },
+      headerStyle: { backgroundColor: theme.header },
       headerTintColor: '#fff',
       headerTitleStyle: { fontWeight: 'bold' }
     }}
@@ -127,7 +152,7 @@ const CustomerStack = () => (
   <Stack.Navigator
     initialRouteName="Marketplace"
     screenOptions={{
-      headerStyle: { backgroundColor: '#2196F3' },
+      headerStyle: { backgroundColor: theme.header },
       headerTintColor: '#fff',
       headerTitleStyle: { fontWeight: 'bold' }
     }}
@@ -162,8 +187,11 @@ const MainNavigation = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.appShell}>
+        <View style={[styles.stackArea, styles.centered]}>
+          <ActivityIndicator size="large" color={theme.spinner} />
+        </View>
+        <AppFooter />
       </View>
     );
   }
@@ -174,17 +202,22 @@ const MainNavigation = () => {
     : 'auth';
 
   return (
-    <NavigationContainer key={navKey}>
-      {user ? (
-        normalizedRole === 'admin' ? <AdminStack /> :
-        normalizedRole === 'farmer' ? <FarmerStack /> :
-        normalizedRole === 'customer' ? <CustomerStack /> :
-        normalizedRole === 'deliveryagent' ? <DeliveryAgentStack /> :
-        <AuthStack />
-      ) : (
-        <AuthStack />
-      )}
-    </NavigationContainer>
+    <View style={styles.appShell}>
+      <View style={styles.stackArea}>
+        <NavigationContainer key={navKey}>
+          {user ? (
+            normalizedRole === 'admin' ? <AdminStack /> :
+            normalizedRole === 'farmer' ? <FarmerStack /> :
+            normalizedRole === 'customer' ? <CustomerStack /> :
+            normalizedRole === 'deliveryagent' ? <DeliveryAgentStack /> :
+            <AuthStack />
+          ) : (
+            <AuthStack />
+          )}
+        </NavigationContainer>
+      </View>
+      <AppFooter />
+    </View>
   );
 };
 
@@ -199,5 +232,19 @@ const AppNavigator = () => {
     </AuthProvider>
   );
 };
+
+const styles = StyleSheet.create({
+  appShell: {
+    flex: 1,
+    backgroundColor: theme.primaryBg
+  },
+  stackArea: {
+    flex: 1
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
+});
 
 export default AppNavigator;

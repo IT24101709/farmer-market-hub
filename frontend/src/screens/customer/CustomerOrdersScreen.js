@@ -18,9 +18,9 @@ const statusColor = (status) => {
     case 'Pending':
       return '#ca8a04';
     case 'Processing':
-      return '#2563eb';
+      return '#15803d';
     case 'Shipped':
-      return '#7c3aed';
+      return '#047857';
     case 'Delivered':
       return '#15803d';
     case 'Cancelled':
@@ -97,7 +97,7 @@ const CustomerOrdersScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading your orders...</Text>
       </View>
     );
@@ -120,9 +120,9 @@ const CustomerOrdersScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
-  loadingText: { marginTop: 10, color: '#0369a1', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  loadingText: { marginTop: 10, color: '#166534', fontWeight: '700' },
   list: { padding: 16, paddingBottom: 40 },
   card: {
     backgroundColor: '#fff',
@@ -130,13 +130,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderRef: { fontSize: 16, fontWeight: '900', color: '#0c4a6e' },
+  orderRef: { fontSize: 16, fontWeight: '900', color: '#14532d' },
   statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusText: { fontWeight: '800', fontSize: 12 },
-  total: { marginTop: 10, fontSize: 20, fontWeight: '900', color: '#0369a1' },
+  total: { marginTop: 10, fontSize: 20, fontWeight: '900', color: '#166534' },
   dateText: { marginTop: 6, color: '#64748b', fontWeight: '600' },
   hint: { marginTop: 10, fontSize: 12, color: '#94a3b8', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#64748b', marginTop: 40, fontWeight: '600', paddingHorizontal: 24 }

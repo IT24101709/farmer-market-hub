@@ -117,7 +117,7 @@ const AdminPaymentScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ffe0b2'
   },
-  filterChipActive: { backgroundColor: '#FF9800', borderColor: '#FF9800' },
+  filterChipActive: { backgroundColor: '#166534', borderColor: '#166534' },
   filterText: { color: '#757575', fontWeight: '700', fontSize: 13 },
   filterTextActive: { color: '#fff' },
   list: { paddingHorizontal: 14, paddingBottom: 40 },
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   methodIcon: { fontSize: 24 },
   txRef: { fontWeight: '800', color: '#0f172a', fontSize: 14 },
-  orderRef: { color: '#0369a1', fontSize: 12, marginTop: 2 },
+  orderRef: { color: '#166534', fontSize: 12, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 11, fontWeight: '800' },
   divider: { height: 1, backgroundColor: '#fff3e0' },

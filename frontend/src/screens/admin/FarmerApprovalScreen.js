@@ -177,7 +177,7 @@ const FarmerApprovalScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading pending farmers...</Text>
       </View>
     );
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   approveBtn: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#15803d',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',

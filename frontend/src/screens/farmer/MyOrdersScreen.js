@@ -23,9 +23,9 @@ const statusColor = (status) => {
       return '#ca8a04';
     case 'CONFIRMED':
     case 'Processing':
-      return '#2563eb';
+      return '#15803d';
     case 'READY_FOR_DELIVERY':
-      return '#7c3aed';
+      return '#047857';
     case 'ASSIGNED':
       return '#9333ea';
     case 'IN_TRANSIT':

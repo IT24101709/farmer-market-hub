@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e2e8f0'
   },
   headerTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a' },
-  markAll: { color: '#2563eb', fontWeight: '800', fontSize: 14 },
+  markAll: { color: '#15803d', fontWeight: '800', fontSize: 14 },
   list: { paddingBottom: 32 },
   row: {
     flexDirection: 'row',
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
     backgroundColor: '#fff'
   },
-  rowUnread: { backgroundColor: '#eff6ff' },
+  rowUnread: { backgroundColor: '#ecfdf5' },
   rowText: { flex: 1, paddingRight: 8 },
   title: { fontSize: 16, fontWeight: '800', color: '#111827' },
   body: { marginTop: 6, color: '#475569', fontWeight: '600', fontSize: 14 },
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#15803d',
     marginTop: 6
   },
   empty: { textAlign: 'center', color: '#64748b', marginTop: 48, fontWeight: '600', paddingHorizontal: 24 }

@@ -126,7 +126,7 @@ const ManageCategoriesScreen = () => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -199,7 +199,7 @@ const ManageCategoriesScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centeredEmpty: { padding: 40, alignItems: 'center' },
   emptyText: { color: '#757575', fontSize: 16 },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FF9800',
+    backgroundColor: '#166534',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 },
   cancelBtn: { padding: 12, marginRight: 10 },
   cancelBtnText: { color: '#757575', fontWeight: 'bold', fontSize: 16 },
-  saveBtn: { backgroundColor: '#FF9800', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, minWidth: 80, alignItems: 'center' },
+  saveBtn: { backgroundColor: '#166534', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, minWidth: 80, alignItems: 'center' },
   saveBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
 });
 

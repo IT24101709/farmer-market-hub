@@ -199,7 +199,7 @@ const FarmerDashboardScreen = ({ navigation }) => {
 
             <View style={styles.statsGrid}>
               <StatCard width={statCardWidth} tone="#22c55e" icon="📦" label="Total Stocks" value={stockStats?.totalStocks || 0} subtext="VEGETABLE TYPES" />
-              <StatCard width={statCardWidth} tone="#3b82f6" icon="⚖" label="Total Quantity" value={`${stockStats?.totalQuantity || 0} kg`} subtext="AVAILABLE" />
+              <StatCard width={statCardWidth} tone="#059669" icon="⚖" label="Total Quantity" value={`${stockStats?.totalQuantity || 0} kg`} subtext="AVAILABLE" />
               <StatCard width={statCardWidth} tone="#10b981" icon="✓" label="Available Items" value={stockStats?.availableItems || 0} subtext="IN STOCK" />
               <StatCard width={statCardWidth} tone="#ef4444" icon="⛔" label="Out of Stock" value={stockStats?.outOfStock || 0} subtext="EMPTY ITEMS" />
               <StatCard width={statCardWidth} tone="#f97316" icon="⚠" label="Low Stock" value={stockStats?.lowStockItems || 0} subtext="ITEMS" />

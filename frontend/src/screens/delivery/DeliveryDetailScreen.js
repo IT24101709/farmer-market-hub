@@ -15,8 +15,8 @@ import { getDeliveryById, cancelDelivery } from '../../services/deliveryService'
 
 const statusColors = {
   pending: '#ca8a04',
-  assigned: '#7c3aed',
-  'in-transit': '#2563eb',
+  assigned: '#047857',
+  'in-transit': '#15803d',
   delivered: '#15803d',
   cancelled: '#b91c1c'
 };
@@ -105,7 +105,7 @@ const DeliveryDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -213,12 +213,12 @@ const DeliveryDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   content: { padding: 18, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
   header: { marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: '900', color: '#0c4a6e' },
-  orderRef: { marginTop: 6, fontSize: 16, color: '#0369a1', fontWeight: '600' },
+  title: { fontSize: 22, fontWeight: '900', color: '#14532d' },
+  orderRef: { marginTop: 6, fontSize: 16, color: '#166534', fontWeight: '600' },
   statusSection: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   section: {
     backgroundColor: '#fff',
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   sectionTitle: { fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 6, textTransform: 'uppercase' },
   statusBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
@@ -250,10 +250,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center'
   },
-  backBtnText: { color: '#0369a1', fontWeight: '600' },
+  backBtnText: { color: '#166534', fontWeight: '600' },
   disabled: { opacity: 0.6 },
   muted: { color: '#64748b', fontWeight: '600' },
-  btn: { marginTop: 16, backgroundColor: '#FF9800', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  btn: { marginTop: 16, backgroundColor: '#166534', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   btnText: { color: '#fff', fontWeight: '800' }
 });
 

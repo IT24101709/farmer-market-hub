@@ -558,9 +558,9 @@ const styles = StyleSheet.create({
   marketBtnSecondary: {
     flex: 1,
     minWidth: 120,
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#ecfdf5',
     borderWidth: 1,
-    borderColor: '#93c5fd',
+    borderColor: '#86efac',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center'
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   marketBtnTextSecondary: {
-    color: '#1d4ed8',
+    color: '#15803d',
     fontWeight: '800',
     fontSize: 12
   },
@@ -582,13 +582,13 @@ const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#bbf7d0',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center'
   },
   editButtonText: {
-    color: '#1d4ed8',
+    color: '#15803d',
     fontWeight: '900'
   },
   deleteButton: {
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   viewLinkText: {
-    color: '#2563eb',
+    color: '#15803d',
     fontWeight: '700',
     fontSize: 13
   },

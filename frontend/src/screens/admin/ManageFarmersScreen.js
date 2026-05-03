@@ -105,7 +105,7 @@ const ManageFarmersScreen = () => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -131,7 +131,7 @@ const ManageFarmersScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContainer: { padding: 15, paddingBottom: 40 },
   emptyText: { fontSize: 16, color: '#757575' },
@@ -169,10 +169,10 @@ const styles = StyleSheet.create({
   },
   statBox: { alignItems: 'center', flex: 1 },
   statLabel: { fontSize: 12, color: '#616161', marginBottom: 4 },
-  statValue: { fontSize: 16, fontWeight: 'bold', color: '#FF9800' },
+  statValue: { fontSize: 16, fontWeight: 'bold', color: '#166534' },
   actionBtn: { padding: 12, borderRadius: 8, alignItems: 'center' },
   btnSuspend: { backgroundColor: '#FFEBEE', borderWidth: 1, borderColor: '#F44336' },
-  btnActivate: { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#4CAF50' },
+  btnActivate: { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#15803d' },
   actionBtnText: { fontWeight: 'bold', color: '#333' }
 });
 

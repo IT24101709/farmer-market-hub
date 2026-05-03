@@ -33,11 +33,11 @@ const statusColors = {
   PENDING: '#ca8a04',
   CONFIRMED: '#15803d',
   CANCELLED: '#b91c1c',
-  DELIVERED: '#2563eb',
+  DELIVERED: '#15803d',
   Pending: '#ca8a04',
   Confirmed: '#15803d',
   Cancelled: '#b91c1c',
-  Delivered: '#2563eb'
+  Delivered: '#15803d'
 };
 
 const getStatusColor = (status) => statusColors[status] || '#64748b';
@@ -120,7 +120,7 @@ const OrderDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color="#15803d" />
       </View>
     );
   }
@@ -213,10 +213,10 @@ const OrderDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f9ff' },
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
   content: { padding: 18, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f9ff' },
-  title: { fontSize: 22, fontWeight: '900', color: '#0c4a6e' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  title: { fontSize: 22, fontWeight: '900', color: '#14532d' },
   statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
   statusLabel: { fontSize: 16, fontWeight: '600', color: '#374151', marginRight: 8 },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
@@ -228,16 +228,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0f2fe'
+    borderColor: '#d1fae5'
   },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: '#64748b', marginBottom: 12, textTransform: 'uppercase' },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   itemInfo: { flex: 1 },
   itemName: { fontWeight: '700', color: '#111827', fontSize: 15 },
   itemMeta: { marginTop: 4, color: '#64748b', fontSize: 13 },
-  itemTotal: { fontWeight: '800', color: '#0369a1', fontSize: 15 },
+  itemTotal: { fontWeight: '800', color: '#166534', fontSize: 15 },
   divider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 12 },
-  grandTotal: { fontWeight: '900', fontSize: 18, color: '#0369a1', textAlign: 'right' },
+  grandTotal: { fontWeight: '900', fontSize: 18, color: '#166534', textAlign: 'right' },
   addressText: { color: '#374151', fontWeight: '600', lineHeight: 22 },
   noteText: { color: '#64748b', fontWeight: '600', fontStyle: 'italic' },
   cancelBtn: {
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   cancelBtnDisabled: { opacity: 0.6 },
   cancelBtnText: { color: '#991b1b', fontWeight: '900' },
   muted: { color: '#64748b', fontWeight: '600' },
-  backBtn: { marginTop: 16, backgroundColor: '#2196F3', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  backBtn: { marginTop: 16, backgroundColor: '#15803d', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   backBtnText: { color: '#fff', fontWeight: '800' }
 });
 

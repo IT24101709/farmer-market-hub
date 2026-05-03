@@ -133,11 +133,22 @@ export const AuthProvider = ({ children }) => {
       const payload = { name, email, password, role, profileDetails };
       console.log('📨 Sending registration request to:', `${API_URL}/register`);
       
-      const response = await fetch(`${API_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let response;
+      try {
+        response = await fetch(`${API_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (err) {
+        const hint =
+          err?.message?.includes('Failed to fetch')
+            ? ' Start the backend and set EXPO_PUBLIC_API_URL if needed (e.g. http://localhost:5001/api).'
+            : '';
+        throw new Error(
+          `${err?.message || 'Network error'} — cannot reach ${API_URL}/register.${hint}`
+        );
+      }
       
       const data = await response.json();
       console.log('📥 Server response status:', response.status);

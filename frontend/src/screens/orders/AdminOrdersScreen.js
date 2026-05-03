@@ -18,14 +18,14 @@ const statusColors = {
   PENDING: '#ca8a04',
   CONFIRMED: '#15803d',
   CANCELLED: '#b91c1c',
-  DELIVERED: '#2563eb',
-  READY_FOR_DELIVERY: '#7c3aed',
-  ASSIGNED: '#7c3aed',
-  IN_TRANSIT: '#7c3aed',
+  DELIVERED: '#15803d',
+  READY_FOR_DELIVERY: '#047857',
+  ASSIGNED: '#047857',
+  IN_TRANSIT: '#047857',
   Pending: '#ca8a04',
   Confirmed: '#15803d',
   Cancelled: '#b91c1c',
-  Delivered: '#2563eb'
+  Delivered: '#15803d'
 };
 
 const getStatusColor = (status) => statusColors[status] || '#64748b';
@@ -156,7 +156,7 @@ const AdminOrdersScreen = ({ navigation }) => {
         <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
         
         {isLoading && (
-          <ActivityIndicator size="small" color="#2196F3" style={styles.actionLoader} />
+          <ActivityIndicator size="small" color="#15803d" style={styles.actionLoader} />
         )}
         
         {!isLoading && (
@@ -204,7 +204,7 @@ const AdminOrdersScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF9800" />
+        <ActivityIndicator size="large" color="#166534" />
       </View>
     );
   }
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     borderColor: '#ffe0b2',
     marginRight: 8
   },
-  filterChipActive: { backgroundColor: '#FF9800', borderColor: '#FF9800' },
+  filterChipActive: { backgroundColor: '#166534', borderColor: '#166534' },
   filterChipText: { color: '#757575', fontWeight: '600', fontSize: 13 },
   filterChipTextActive: { color: '#fff' },
   list: { paddingHorizontal: 12, paddingBottom: 32 },
