@@ -179,9 +179,21 @@ export const getDeliveryAgents = async (token) => {
 
 // ============ Stock/Product Management ============
 
-export const getAdminStocks = async (token) => {
+export const getAdminStocks = async (token, params = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/stocks`, {
+    const queryParams = new URLSearchParams(params).toString();
+    const response = await axios.get(`${apiUrl}/stocks/all?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const deactivateStock = async (stockId, token) => {
+  try {
+    const response = await axios.patch(`${apiUrl}/stocks/${stockId}/deactivate`, {}, {
       headers: getAuthHeaders(token)
     });
     return response.data;

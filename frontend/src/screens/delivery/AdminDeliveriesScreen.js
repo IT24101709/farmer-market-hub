@@ -175,6 +175,7 @@ const AdminDeliveriesScreen = ({ navigation }) => {
         data={STATUS_FILTERS}
         keyExtractor={(item) => item}
         renderItem={renderFilter}
+        style={{ flexGrow: 0 }}
         contentContainerStyle={styles.filterList}
         showsHorizontalScrollIndicator={false}
       />

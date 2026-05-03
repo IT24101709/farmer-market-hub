@@ -106,7 +106,7 @@ exports.createOrder = async (req, res) => {
       price: Number(item.price),
       farmerId: normalizeFarmerId(item.farmerId),
       farmerConfirmed: false,
-      stockDeducted: false
+      stockDeducted: true
     }));
 
     const totalAmount = normalizedItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -122,6 +122,40 @@ exports.createOrder = async (req, res) => {
       deliveryAddress: (deliveryAddress || '').trim(),
       note: (note || '').trim()
     });
+
+    // Deduct stock immediately after order creation
+    for (const item of normalizedItems) {
+      const stock = await Stock.findById(item.stockId);
+      if (stock) {
+        stock.quantity -= item.quantity;
+        
+        if (stock.quantity <= 0) {
+          // Auto-delete if quantity reaches 0
+          if (stock.imageUrl) {
+            const fs = require('fs');
+            const path = require('path');
+            const relImg = String(stock.imageUrl || '').replace(/^[/\\]+/, '');
+            const filePath = path.join(__dirname, '..', '..', relImg);
+            if (fs.existsSync(filePath)) {
+              try { fs.unlinkSync(filePath); } catch(e) {}
+            }
+          }
+          await Stock.findByIdAndDelete(stock._id);
+          
+          const AuditLog = require('../models/AuditLog');
+          await AuditLog.create({
+            userId: customerObjectId,
+            stockId: stock._id,
+            action: 'STOCK_AUTO_DELETED',
+            ip: req.ip || req.connection?.remoteAddress,
+            userAgent: req.get('User-Agent'),
+            details: { name: stock.name, reason: 'Quantity reached zero after customer order' }
+          });
+        } else {
+          await stock.save();
+        }
+      }
+    }
 
     await notifyFarmersForOrder(order, {
       title: 'New vegetable order',

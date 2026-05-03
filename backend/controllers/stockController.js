@@ -725,3 +725,58 @@ exports.bulkUpdateStocks = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// @desc    Get all stocks regardless of status
+// @route   GET /api/stocks/all
+// @access  Private Admin
+exports.getAllStocksAdmin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.search) {
+      query.name = { $regex: req.query.search, $options: 'i' };
+    }
+
+    const total = await Stock.countDocuments(query);
+    const stocks = await Stock.find(query)
+      .populate('farmerId', 'name email profileDetails')
+      .populate('categoryId', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.status(200).json({ 
+      success: true, 
+      products: stocks,
+      pagination: {
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Deactivate stock by Admin
+// @route   PATCH /api/stocks/:id/deactivate
+// @access  Private Admin
+exports.deactivateStockAdmin = async (req, res) => {
+  try {
+    const stock = await Stock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+
+    stock.status = 'Out of Stock';
+    stock.availabilityStatus = false;
+    stock.visibility = false;
+    await stock.save();
+
+    res.status(200).json({ message: 'Stock deactivated successfully', stock });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

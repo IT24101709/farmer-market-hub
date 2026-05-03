@@ -14,10 +14,12 @@ const {
   updateAvailability,
   removeExpiredStock,
   bulkAddStocks,
-  bulkUpdateStocks
+  bulkUpdateStocks,
+  getAllStocksAdmin,
+  deactivateStockAdmin
 } = require('../controllers/stockController');
 const { validateStockData } = require('../middleware/stockValidation');
-const { protect, farmerRole } = require('../middleware/authMiddleware');
+const { protect, farmerRole, adminRole } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 const handleUpload = (req, res, next) => {
@@ -49,6 +51,9 @@ router.route('/')
 router.route('/my')
   .get(protect, farmerRole, getMyStocks);
 
+router.route('/all')
+  .get(protect, adminRole, getAllStocksAdmin);
+
 // Bulk operations (Must be before /:id)
 router.route('/bulk/add')
   .post(protect, farmerRole, bulkAddStocks);
@@ -69,6 +74,9 @@ router.route('/:id/visibility')
 
 router.route('/:id/status')
   .patch(protect, farmerRole, updateStatus);
+
+router.route('/:id/deactivate')
+  .patch(protect, adminRole, deactivateStockAdmin);
 
 router.route('/:id/quantity')
   .patch(protect, farmerRole, updateQuantity);

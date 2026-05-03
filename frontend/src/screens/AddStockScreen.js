@@ -38,14 +38,21 @@ const FARM_IMAGE = {
   uri: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=1800&q=80'
 };
 
-const emptyForm = {
+const formatYmd = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const getEmptyForm = () => ({
   vegetableName: '',
   categoryId: '',
   quantity: '',
   pricePerKg: '',
-  harvestDate: '',
+  harvestDate: formatYmd(new Date()),
   status: 'Available'
-};
+});
 
 const showToast = (title, message) => {
   if (Platform.OS === 'android') {
@@ -126,17 +133,12 @@ const sanitizePriceInput = (raw) => {
   return t;
 };
 
-const formatYmd = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
+
 
 const AddStockScreen = ({ navigation }) => {
   const { token, logout, refreshSession } = useContext(AuthContext);
   const { width } = useWindowDimensions();
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(getEmptyForm);
   const [categories, setCategories] = useState([]);
   const [image, setImage] = useState(null);
   const [errors, setErrors] = useState({});
@@ -275,7 +277,7 @@ const AddStockScreen = ({ navigation }) => {
   };
 
   const resetForm = () => {
-    setForm(emptyForm);
+    setForm(getEmptyForm());
     setImage(null);
     setErrors({});
     setShowHarvestPicker(false);

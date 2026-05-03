@@ -16,6 +16,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { CartContext } from '../../context/CartContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import { getMarketProducts } from '../../services/marketService';
+import { getAdminStocks, deactivateStock } from '../../services/adminService';
 import { deleteStock } from '../../services/stockService';
 import { resolveStockImageUrl } from '../../config';
 import { Alert, Platform } from 'react-native';
@@ -66,7 +67,10 @@ const MarketplaceScreen = ({ navigation }) => {
         maxPrice: maxPrice.trim() ? Number(maxPrice) : undefined
       };
 
-      const data = await getMarketProducts(params, token);
+      const isAdmin = user?.role === 'Admin' || user?.role === 'admin';
+      const data = isAdmin
+        ? await getAdminStocks(token, params)
+        : await getMarketProducts(params, token);
 
       if (isRefresh || pageNum === 1) {
         setProducts(data.products || []);
@@ -136,6 +140,32 @@ const MarketplaceScreen = ({ navigation }) => {
     }
   };
 
+  const handleAdminDeactivate = (stockId) => {
+    const msg = 'Are you sure you want to deactivate this product?';
+    if (Platform.OS === 'web') {
+      if (!window.confirm(msg)) return;
+      deactivateStock(stockId, token)
+        .then(() => fetchProducts(1, true))
+        .catch(err => window.alert(err.message || 'Failed to deactivate'));
+    } else {
+      Alert.alert('Deactivate Product', msg, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Deactivate',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deactivateStock(stockId, token);
+              fetchProducts(1, true);
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to deactivate');
+            }
+          }
+        }
+      ]);
+    }
+  };
+
   const renderProduct = ({ item }) => {
     const stockShortId = item._id ? item._id.substring(item._id.length - 6).toUpperCase() : 'N/A';
     const farmerShortId = item.farmerId?._id
@@ -146,11 +176,16 @@ const MarketplaceScreen = ({ navigation }) => {
     const imageUri = imageUrlForProduct(item);
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, !item.availabilityStatus && { opacity: 0.7 }]}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="cover" />
         ) : (
           <View style={[styles.cardImage, styles.imagePlaceholder]} />
+        )}
+        {!item.availabilityStatus && (
+          <View style={styles.inactiveBadge}>
+            <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
+          </View>
         )}
         <View style={styles.cardContent}>
           <View style={styles.titleRow}>
@@ -200,6 +235,12 @@ const MarketplaceScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('EditStock', { stock: item })}
               >
                 <Text style={styles.adminBtnText}>✏️ Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.adminEditBtn, { backgroundColor: '#f59e0b' }]}
+                onPress={() => handleAdminDeactivate(item._id)}
+              >
+                <Text style={styles.adminBtnText}>🚫 Deactivate</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.adminDeleteBtn}
@@ -492,6 +533,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     backgroundColor: '#EEEEEE',
+  },
+  inactiveBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(220, 38, 38, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+  },
+  inactiveBadgeText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   cardContent: {
     padding: 15,
