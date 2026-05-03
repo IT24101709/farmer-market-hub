@@ -355,19 +355,34 @@ exports.assignRegion = async (req, res) => {
   }
 };
 
-// @desc    Get delivery agents
+// @desc    Get delivery agents (filtered)
 // @route   GET /api/admin/delivery-agents
 // @access Private (Admin only)
 exports.getDeliveryAgents = async (req, res) => {
   try {
-    const agents = await User.find({ role: 'DeliveryAgent' })
-      .select('-password')
-      .sort({ createdAt: -1 });
+    const { minKg = 0, vehicleType, city } = req.query;
+    
+    let filter = { role: 'DeliveryAgent', 'profileDetails.isActiveAgent': true };
+
+    if (parseFloat(minKg) > 0) {
+      filter['profileDetails.maxCapacityKg'] = { $gte: parseFloat(minKg) };
+    }
+    if (vehicleType) {
+      filter['profileDetails.vehicleType'] = vehicleType;
+    }
+    if (city) {
+      filter['profileDetails.serviceCities'] = city;
+    }
+
+    const agents = await User.find(filter)
+      .select('-password profileDetails')
+      .sort({ 'profileDetails.maxCapacityKg': -1, createdAt: -1 });
     res.status(200).json(agents);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // @desc    Assign delivery agent to order
 // @route   POST /api/admin/orders/:id/assign-agent

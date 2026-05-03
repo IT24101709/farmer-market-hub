@@ -204,9 +204,10 @@ export const assignDelivery = async (body, token) => {
   }
 };
 
-export const getDeliveryAgents = async (token) => {
+export const getDeliveryAgents = async (token, filters = {}) => {
   try {
     const response = await axios.get(`${ADMIN_API_URL}/delivery-agents`, {
+      params: filters,
       headers: authHeaders(token)
     });
     return response.data;
@@ -214,6 +215,7 @@ export const getDeliveryAgents = async (token) => {
     throw normalizeError(error, 'Failed to load agents');
   }
 };
+
 
 export const getPendingShipments = async (token) => {
   try {

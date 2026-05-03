@@ -84,15 +84,41 @@ const AdminDeliveriesScreen = ({ navigation }) => {
     setShowModal(true);
   };
 
+  const [agentFilters, setAgentFilters] = useState({ minKg: 0, vehicleType: '', city: '' });
+
   const loadAgents = async () => {
     try {
-      const res = await getDeliveryAgents(token);
+      // Compute filters from delivery
+      const totalWeight = selectedDelivery?.orderId?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+      const addressCity = extractCity(selectedDelivery?.deliveryAddress || '');
+      
+      const filters = {
+        minKg: Math.ceil(totalWeight),
+        city: addressCity,
+        // vehicleType auto or manual
+      };
+
+      console.log('Loading agents with filters:', filters);
+      
+      const res = await getDeliveryAgents(token, filters);
       setAgents(Array.isArray(res.data) ? res.data : []);
+      setAgentFilters(filters);
     } catch (e) {
       console.error(e);
       setAgents([]);
     }
   };
+
+  const extractCity = (address) => {
+    if (!address) return '';
+    const cities = ['Colombo', 'Kandy', 'Galle', 'Jaffna', 'Matara'];
+    const upper = address.toUpperCase();
+    for (let city of cities) {
+      if (upper.includes(city.toUpperCase())) return city;
+    }
+    return '';
+  };
+
 
   const handleAssignAgent = async (agentId) => {
     if (!selectedDelivery || !agentId) return;
@@ -198,17 +224,32 @@ const AdminDeliveriesScreen = ({ navigation }) => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Delivery Agent</Text>
             
-            {agents.map((agent) => (
-              <TouchableOpacity
-                key={agent._id}
-                style={styles.agentItem}
-                onPress={() => handleAssignAgent(agent._id)}
-                disabled={assigning}
-              >
-                <Text style={styles.agentName}>{agent.name}</Text>
-                <Text style={styles.agentEmail}>{agent.email}</Text>
-              </TouchableOpacity>
-            ))}
+            {agents.length === 0 ? (
+              <Text style={styles.noAgents}>No suitable agents found for this delivery</Text>
+            ) : (
+              agents.map((agent) => {
+                const profile = agent.profileDetails || {};
+                return (
+                  <TouchableOpacity
+                    key={agent._id}
+                    style={styles.agentItem}
+                    onPress={() => handleAssignAgent(agent._id)}
+                    disabled={assigning}
+                  >
+                    <Text style={styles.agentName}>{agent.name}</Text>
+                    <Text style={styles.agentEmail}>{agent.email}</Text>
+                    {profile.vehicleType && (
+                      <Text style={styles.agentDetail}>Vehicle: {profile.vehicleType}</Text>
+                    )}
+                    <Text style={styles.agentDetail}>Max: {profile.maxCapacityKg || 0}kg</Text>
+                    {profile.serviceCities?.length > 0 && (
+                      <Text style={styles.agentCities}>{profile.serviceCities.join(', ')}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
 
             <TouchableOpacity
               style={styles.closeBtn}
@@ -263,6 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   assignBtnText: { color: '#2e7d32', fontWeight: '700' },
+  noAgents: { textAlign: 'center', color: '#757575', padding: 20, fontStyle: 'italic' },
   empty: { textAlign: 'center', color: '#757575', marginTop: 40 },
   modalOverlay: {
     flex: 1,
@@ -274,8 +316,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
-    width: '80%',
-    maxHeight: '60%'
+    width: '90%',
+    maxHeight: '70%'
   },
   modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 16, color: '#e65100' },
   agentItem: {
@@ -285,6 +327,8 @@ const styles = StyleSheet.create({
   },
   agentName: { fontWeight: '700', color: '#333' },
   agentEmail: { fontSize: 12, color: '#757575' },
+  agentDetail: { fontSize: 12, color: '#424242', marginTop: 2 },
+  agentCities: { fontSize: 11, color: '#666', marginTop: 2 },
   closeBtn: {
     marginTop: 16,
     paddingVertical: 12,
@@ -292,5 +336,6 @@ const styles = StyleSheet.create({
   },
   closeBtnText: { color: '#757575', fontWeight: '600' }
 });
+
 
 export default AdminDeliveriesScreen;

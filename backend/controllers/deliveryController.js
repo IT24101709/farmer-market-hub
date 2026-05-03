@@ -447,12 +447,30 @@ exports.getDeliveryStats = async (req, res) => {
 // @access  Private Admin
 exports.getDeliveryAgents = async (req, res) => {
   try {
-    const agents = await User.find({ 
-      $or: [{ role: 'DeliveryAgent' }, { role: 'agent' }]
-    }).select('name email profileDetails');
+    const { minKg = 0, vehicleType, city } = req.query;
+    
+    let filter = {
+      $or: [{ role: 'DeliveryAgent' }, { role: 'agent' }],
+      'profileDetails.isActiveAgent': true
+    };
+
+    if (parseFloat(minKg) > 0) {
+      filter['profileDetails.maxCapacityKg'] = { $gte: parseFloat(minKg) };
+    }
+    if (vehicleType) {
+      filter['profileDetails.vehicleType'] = vehicleType;
+    }
+    if (city) {
+      filter['profileDetails.serviceCities'] = city;
+    }
+
+    const agents = await User.find(filter)
+      .select('name email profileDetails')
+      .sort({ 'profileDetails.maxCapacityKg': -1, createdAt: -1 });
 
     res.status(200).json({ success: true, data: agents });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+

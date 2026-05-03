@@ -83,11 +83,31 @@ const userSchema = new mongoose.Schema({
       type: String,
       trim: true,
       maxlength: 100
+    },
+    // Delivery Agent capabilities
+    maxCapacityKg: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    vehicleType: {
+      type: String,
+      enum: ['bike', 'van', 'truck', 'tempo'],
+      default: null
+    },
+    serviceCities: [{
+      type: String,
+      trim: true
+    }],
+    isActiveAgent: {
+      type: Boolean,
+      default: true
     }
   }
 }, {
   timestamps: true
 });
+
 
 userSchema.pre('validate', async function(next) {
   try {
