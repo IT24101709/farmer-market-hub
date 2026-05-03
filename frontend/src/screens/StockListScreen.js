@@ -116,11 +116,12 @@ const StockListScreen = ({ navigation }) => {
       const msg = `Remove ${stock.vegetableName || stock.name} from your listings?`;
       if (Platform.OS === 'web') {
         if (window.confirm(msg)) {
+          const prevStocks = [...stocks];
+          setStocks((current) => current.filter((item) => item._id !== stock._id));
+          
           deleteStock(stock._id, token)
-            .then(() => {
-              setStocks((current) => current.filter((item) => item._id !== stock._id));
-            })
             .catch((error) => {
+              setStocks(prevStocks);
               if (error.status === 401) logout();
               window.alert(error.message || 'Failed to delete stock.');
             });
@@ -137,10 +138,13 @@ const StockListScreen = ({ navigation }) => {
             text: 'Delete',
             style: 'destructive',
             onPress: async () => {
+              const prevStocks = [...stocks];
+              setStocks((current) => current.filter((item) => item._id !== stock._id));
+              
               try {
                 await deleteStock(stock._id, token);
-                setStocks((current) => current.filter((item) => item._id !== stock._id));
               } catch (error) {
+                setStocks(prevStocks);
                 if (error.status === 401) logout();
                 Alert.alert('Error', error.message || 'Failed to delete stock.');
               }
@@ -149,7 +153,7 @@ const StockListScreen = ({ navigation }) => {
         ]
       );
     },
-    [token, logout]
+    [token, logout, stocks]
   );
 
   const handleToggleMarketplace = useCallback(

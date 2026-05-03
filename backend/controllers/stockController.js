@@ -303,6 +303,39 @@ syncAvailabilityFields(stock);
     stock.imageUrl = newImageUrl;
 
     const oldStatus = stock.status;
+
+    // Auto-delete if quantity is zero
+    if (stock.quantity === 0) {
+      // Image cleanup
+      if (stock.imageUrl) {
+        const fs = require('fs');
+        const path = require('path');
+        const relImg = String(stock.imageUrl || '').replace(/^[/\\]+/, '');
+        const filePath = path.join(__dirname, '..', '..', relImg);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch(e) {}
+        }
+      }
+
+      await Stock.findByIdAndDelete(stock._id);
+      
+      // Audit log
+      const AuditLog = require('../models/AuditLog');
+      await AuditLog.create({
+        userId: req.user.id,
+        stockId: stock._id,
+        action: 'STOCK_AUTO_DELETED',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+        details: { name: stock.name, reason: 'Quantity reached zero' }
+      });
+
+      return res.status(200).json({ 
+        message: `✅ Stock for ${stock.name} quantity reached zero and was auto-deleted.`,
+        stock: null 
+      });
+    }
+
     const updatedStock = await stock.save();
     changedFields.newStatus = updatedStock.status;
 
@@ -465,6 +498,37 @@ exports.updateQuantity = async (req, res) => {
 
     stock.quantity = quantity;
     syncAvailabilityFields(stock);
+
+    if (stock.quantity === 0) {
+      // Image cleanup
+      if (stock.imageUrl) {
+        const fs = require('fs');
+        const path = require('path');
+        const relImg = String(stock.imageUrl || '').replace(/^[/\\]+/, '');
+        const filePath = path.join(__dirname, '..', '..', relImg);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch(e) {}
+        }
+      }
+
+      await Stock.findByIdAndDelete(stock._id);
+      
+      // Audit log
+      const AuditLog = require('../models/AuditLog');
+      await AuditLog.create({
+        userId: req.user.id,
+        stockId: stock._id,
+        action: 'STOCK_AUTO_DELETED',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+        details: { name: stock.name, reason: 'Quantity reached zero via quick update' }
+      });
+
+      return res.status(200).json({
+        message: 'Quantity updated to zero. Stock auto-deleted.',
+        stock: null
+      });
+    }
 
     const updatedStock = await stock.save();
     res.status(200).json({
@@ -638,6 +702,16 @@ exports.bulkUpdateStocks = async (req, res) => {
 
         // Auto-remove if quantity <= 0
         if (existingStock.quantity <= 0) {
+          // Image cleanup
+          if (existingStock.imageUrl) {
+            const fs = require('fs');
+            const path = require('path');
+            const relImg = String(existingStock.imageUrl || '').replace(/^[/\\]+/, '');
+            const filePath = path.join(__dirname, '..', '..', relImg);
+            if (fs.existsSync(filePath)) {
+              try { fs.unlinkSync(filePath); } catch(e) {}
+            }
+          }
           await Stock.findByIdAndDelete(existingStock._id);
         } else {
           await existingStock.save();
