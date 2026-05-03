@@ -27,6 +27,29 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const storeSession = async (nextUser, nextToken) => {
+    setToken(nextToken);
+    setUser(nextUser);
+    await AsyncStorage.setItem('userToken', nextToken);
+    if (nextUser?.refreshToken) await AsyncStorage.setItem('refreshToken', nextUser.refreshToken);
+    await AsyncStorage.setItem('userData', JSON.stringify(nextUser));
+  };
+
+  const fetchCurrentUser = async (accessToken) => {
+    const API_URL = authBaseUrl();
+    const response = await fetch(`${API_URL}/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to load profile');
+    }
+
+    return normalizeAuthPayload({ ...data, accessToken });
+  };
+
   useEffect(() => {
     // Check if user is logged in
     const loadUserData = async () => {
@@ -38,6 +61,14 @@ export const AuthProvider = ({ children }) => {
           const normalizedUser = normalizeAuthPayload(JSON.parse(storedUser));
           setToken(storedToken);
           setUser(normalizedUser);
+
+          try {
+            const freshUser = await fetchCurrentUser(storedToken);
+            await AsyncStorage.setItem('userData', JSON.stringify(freshUser));
+            setUser(freshUser);
+          } catch (profileError) {
+            console.warn('Failed to refresh profile data', profileError);
+          }
         }
       } catch (error) {
         console.error('Failed to load user data', error);
@@ -89,12 +120,7 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Login succeeded but user role is missing. Check the API response.');
     }
 
-    setToken(tokenToStore);
-    setUser(normalizedUser);
-
-    await AsyncStorage.setItem('userToken', tokenToStore);
-    if (normalizedUser?.refreshToken) await AsyncStorage.setItem('refreshToken', normalizedUser.refreshToken);
-    await AsyncStorage.setItem('userData', JSON.stringify(normalizedUser));
+    await storeSession(normalizedUser, tokenToStore);
 
     return normalizedUser;
   };
@@ -127,12 +153,7 @@ export const AuthProvider = ({ children }) => {
       if (data.accessToken || data.token) {
         const normalizedUser = normalizeAuthPayload(data);
         const tokenToStore = normalizedUser?.accessToken;
-        setToken(tokenToStore);
-        setUser(normalizedUser);
-        
-        await AsyncStorage.setItem('userToken', tokenToStore);
-        if (normalizedUser?.refreshToken) await AsyncStorage.setItem('refreshToken', normalizedUser.refreshToken);
-        await AsyncStorage.setItem('userData', JSON.stringify(normalizedUser));
+        await storeSession(normalizedUser, tokenToStore);
         console.log('✅ User data stored in AsyncStorage');
       } else if (role === 'Farmer' && !data.isApproved) {
         // For farmers awaiting approval, do NOT set user state or token.
@@ -230,12 +251,7 @@ export const AuthProvider = ({ children }) => {
 
       const tokenToStore = data.accessToken || data.token;
       const normalizedUser = normalizeAuthPayload(data);
-      setToken(tokenToStore);
-      setUser(normalizedUser);
-      
-      await AsyncStorage.setItem('userToken', tokenToStore);
-      if (normalizedUser?.refreshToken) await AsyncStorage.setItem('refreshToken', normalizedUser.refreshToken);
-      await AsyncStorage.setItem('userData', JSON.stringify(normalizedUser));
+      await storeSession(normalizedUser, tokenToStore);
       
       return normalizedUser;
     } catch (error) {

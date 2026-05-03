@@ -2,7 +2,28 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
+const publicUserPayload = (user) => ({
+  _id: user.id || user._id,
+  id: user.id || String(user._id),
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  farmerId: user.farmerId,
+  isApproved: user.isApproved,
+  status: user.status,
+  profileDetails: user.profileDetails || {},
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt
+});
+
 // Helper to generate Access JWT — override with JWT_EXPIRES_IN (e.g. 15m, 24h, 7d)
+const ensureFarmerId = async (user) => {
+  if (user?.role === 'Farmer' && !user.farmerId) {
+    await user.save();
+  }
+  return user;
+};
+
 const generateAccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_key', {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h'
@@ -58,6 +79,13 @@ const refreshToken = async (req, res) => {
 const registerUser = async (req, res) => {
   try {
     const { name, email, password, role, profileDetails } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const normalizedProfileDetails = {
+      ...(profileDetails || {}),
+      phone: (profileDetails?.phone || '').trim(),
+      businessName: (profileDetails?.businessName || '').trim(),
+      address: (profileDetails?.address || '').trim()
+    };
 
     if (!name || !email || !password || !role) {
       return res.status(400).json({ message: '❌ Please fill in all required fields (*).' });
@@ -72,7 +100,7 @@ const registerUser = async (req, res) => {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ message: '❌ Please enter a valid email address.' });
     }
 
@@ -82,7 +110,7 @@ const registerUser = async (req, res) => {
     }
 
     // Phone validation: Required for Farmers, optional for Customers
-    const phone = profileDetails?.phone || '';
+    const phone = normalizedProfileDetails.phone;
     if (role === 'Farmer') {
       if (!phone || !/^\d{10,15}$/.test(phone)) {
         return res.status(400).json({ message: '❌ Enter a valid 10-digit mobile number.' });
@@ -93,23 +121,30 @@ const registerUser = async (req, res) => {
     }
 
     if (role === 'Farmer') {
-      const businessName = profileDetails?.businessName || '';
+      const businessName = normalizedProfileDetails.businessName;
       if (!businessName || businessName.length > 100) {
         return res.status(400).json({ message: '❌ Farm Name is required and must be under 100 characters.' });
       }
     }
 
     if (role === 'Customer') {
-      const address = profileDetails?.address || '';
+      const address = normalizedProfileDetails.address;
       if (address && address.length > 200) {
         return res.status(400).json({ message: '❌ Address must be under 200 characters.' });
       }
     }
 
     // Check if user exists
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: '❌ A user with this email already exists.' });
+    }
+
+    if (phone) {
+      const phoneExists = await User.findOne({ 'profileDetails.phone': phone });
+      if (phoneExists) {
+        return res.status(400).json({ message: 'A user with this phone number already exists.' });
+      }
     }
 
     // Hash password
@@ -120,23 +155,17 @@ const registerUser = async (req, res) => {
     const userRole = role || 'Customer'; // Admin must be created manually or via specific secure endpoint usually, but we allow Farmers and Customers here.
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       role: userRole,
-      profileDetails
+      profileDetails: normalizedProfileDetails
     });
 
     if (user) {
       // For farmers, they need admin approval before they can login
       const isFarmerAwaitingApproval = user.role === 'Farmer' && !user.isApproved;
       
-      const response = {
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isApproved: user.isApproved
-      };
+      const response = publicUserPayload(user);
       
       if (!isFarmerAwaitingApproval) {
         response.accessToken = generateAccessToken(user._id);
@@ -182,6 +211,8 @@ const loginUser = async (req, res) => {
     });
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      await ensureFarmerId(user);
+
       // Check if user is suspended
       if (user.status === 'Suspended') {
         return res.status(403).json({
@@ -199,12 +230,7 @@ const loginUser = async (req, res) => {
       }
 
       res.json({
-        _id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isApproved: user.isApproved,
-        status: user.status,
+        ...publicUserPayload(user),
         accessToken: generateAccessToken(user._id),
         refreshToken: generateRefreshToken(user._id)
       });
@@ -222,8 +248,9 @@ const loginUser = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
+    const user = await User.findById(req.user.id);
+    await ensureFarmerId(user);
+    res.json(publicUserPayload(user));
   } catch (error) {
     res.status(500).json({ message: 'Server error fetching profile' });
   }
@@ -282,13 +309,7 @@ const approveFarmer = async (req, res) => {
 
     res.json({
       message: `✅ Farmer ${farmer.name} has been approved. They can now log in.`,
-      farmer: {
-        _id: farmer._id,
-        name: farmer.name,
-        email: farmer.email,
-        role: farmer.role,
-        isApproved: farmer.isApproved
-      }
+      farmer: publicUserPayload(farmer)
     });
   } catch (error) {
     console.error(error);
@@ -342,14 +363,34 @@ const updateProfile = async (req, res) => {
 
     if (user) {
       user.name = req.body.name || user.name;
-      user.email = req.body.email || user.email;
+      if (req.body.email) {
+        const normalizedEmail = req.body.email.trim().toLowerCase();
+        const emailOwner = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+        if (emailOwner) {
+          return res.status(400).json({ message: 'A user with this email already exists.' });
+        }
+        user.email = normalizedEmail;
+      }
       
       // Update profileDetails if provided
       if (req.body.profileDetails) {
-        user.profileDetails = {
+        const nextProfileDetails = {
           ...user.profileDetails,
           ...req.body.profileDetails
         };
+
+        if (nextProfileDetails.phone) {
+          nextProfileDetails.phone = String(nextProfileDetails.phone).trim();
+          const phoneOwner = await User.findOne({
+            'profileDetails.phone': nextProfileDetails.phone,
+            _id: { $ne: user._id }
+          });
+          if (phoneOwner) {
+            return res.status(400).json({ message: 'A user with this phone number already exists.' });
+          }
+        }
+
+        user.profileDetails = nextProfileDetails;
       }
 
       if (req.body.password) {
@@ -360,11 +401,7 @@ const updateProfile = async (req, res) => {
       const updatedUser = await user.save();
 
       res.json({
-        _id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        profileDetails: updatedUser.profileDetails,
+        ...publicUserPayload(updatedUser),
         accessToken: generateAccessToken(updatedUser._id),
         refreshToken: generateRefreshToken(updatedUser._id)
       });

@@ -12,6 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
+import getEnvVars from '../../config';
 
 const FarmerApprovalScreen = ({ navigation }) => {
   const [pendingFarmers, setPendingFarmers] = useState([]);
@@ -23,7 +24,7 @@ const FarmerApprovalScreen = ({ navigation }) => {
   const [processingId, setProcessingId] = useState(null);
 
   const { token } = useContext(AuthContext);
-  const API_URL = 'http://10.0.2.2:5000/api/auth';
+  const API_URL = `${getEnvVars().apiUrl}/auth`;
 
   useEffect(() => {
     fetchPendingFarmers();

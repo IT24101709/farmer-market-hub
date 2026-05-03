@@ -27,6 +27,10 @@ const FARM_IMAGE = {
   uri: 'https://images.unsplash.com/photo-1492496913980-501348b61469?auto=format&fit=crop&w=1800&q=80'
 };
 
+const displayFarmerId = (user) => (
+  user?.farmerId || (user?._id ? `F-${String(user._id).slice(-6).toUpperCase()}` : '-')
+);
+
 const FarmerProfileScreen = ({ navigation }) => {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [editing, setEditing] = useState(false);
@@ -125,7 +129,7 @@ const FarmerProfileScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.infoGrid}>
-                <ProfileField label="Farmer ID" value={user?.farmerId || 'F001'} editable={false} />
+                <ProfileField label="Farmer ID" value={displayFarmerId(user)} editable={false} />
                 <ProfileField label="Full Name" value={form.name} editable={editing} error={errors.name} onChangeText={(value) => updateField('name', value)} />
                 <ProfileField label="Phone" value={form.phone} editable={editing} error={errors.phone} onChangeText={(value) => updateField('phone', value)} keyboardType="phone-pad" />
                 <ProfileField label="Email" value={form.email} editable={editing} error={errors.email} onChangeText={(value) => updateField('email', value)} keyboardType="email-address" />

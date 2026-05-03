@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { getNextSequence } = require('../utils/counter');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -22,6 +23,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['Admin', 'Farmer', 'Customer', 'DeliveryAgent'],
     default: 'Customer'
+  },
+  farmerId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
   },
   status: {
     type: String,
@@ -80,6 +87,18 @@ const userSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+userSchema.pre('validate', async function(next) {
+  try {
+    if (this.role === 'Farmer' && !this.farmerId) {
+      const sequence = await getNextSequence('farmerId');
+      this.farmerId = `F${String(sequence).padStart(4, '0')}`;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);
