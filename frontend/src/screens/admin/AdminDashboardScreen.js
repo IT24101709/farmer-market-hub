@@ -107,6 +107,10 @@ const AdminDashboardScreen = ({ navigation }) => {
           <Text style={styles.cardIcon}>P</Text>
           <Text style={styles.cardTitle}>Payments</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Marketplace')}>
+          <Text style={styles.cardIcon}>🏪</Text>
+          <Text style={styles.cardTitle}>Marketplace</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Notifications')}>
           <Text style={styles.cardIcon}>🔔</Text>
           <Text style={styles.cardTitle}>Notifications</Text>

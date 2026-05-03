@@ -94,6 +94,18 @@ export const assignAgent = async (deliveryId, agentId, token) => {
   }
 };
 
+// Assign third-party driver (agent)
+export const assignDriverToDelivery = async (deliveryId, driverData, token) => {
+  try {
+    const response = await axios.patch(`${API_URL}/${deliveryId}/driver`, driverData, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to assign driver');
+  }
+};
+
 // Update delivery status (agent)
 export const updateDeliveryStatus = async (deliveryId, status, token) => {
   try {

@@ -16,7 +16,9 @@ import { AuthContext } from '../../context/AuthContext';
 import { CartContext } from '../../context/CartContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import { getMarketProducts } from '../../services/marketService';
+import { deleteStock } from '../../services/stockService';
 import { resolveStockImageUrl } from '../../config';
+import { Alert, Platform } from 'react-native';
 
 const CATEGORY_CHIPS = [
   { label: 'All', value: '' },
@@ -33,7 +35,7 @@ const CATEGORY_CHIPS = [
 const imageUrlForProduct = (item) => resolveStockImageUrl(item);
 
 const MarketplaceScreen = ({ navigation }) => {
-  const { token, logout } = useContext(AuthContext);
+  const { token, user, logout } = useContext(AuthContext);
   const { addToCart, cartItems } = useContext(CartContext);
   const { unreadCount } = useContext(NotificationContext);
   const [products, setProducts] = useState([]);
@@ -108,6 +110,32 @@ const MarketplaceScreen = ({ navigation }) => {
     );
   };
 
+  const handleAdminDelete = (stockId) => {
+    const msg = 'Are you sure you want to delete this product?';
+    if (Platform.OS === 'web') {
+      if (!window.confirm(msg)) return;
+      deleteStock(stockId, token)
+        .then(() => fetchProducts(1, true))
+        .catch(err => window.alert(err.message || 'Failed to delete'));
+    } else {
+      Alert.alert('Delete Product', msg, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteStock(stockId, token);
+              fetchProducts(1, true);
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to delete');
+            }
+          }
+        }
+      ]);
+    }
+  };
+
   const renderProduct = ({ item }) => {
     const stockShortId = item._id ? item._id.substring(item._id.length - 6).toUpperCase() : 'N/A';
     const farmerShortId = item.farmerId?._id
@@ -164,6 +192,23 @@ const MarketplaceScreen = ({ navigation }) => {
           >
             <Text style={styles.reviewButtonText}>Reviews & Rating</Text>
           </TouchableOpacity>
+
+          {(user?.role === 'Admin' || user?.role === 'admin') && (
+            <View style={styles.adminActionsRow}>
+              <TouchableOpacity
+                style={styles.adminEditBtn}
+                onPress={() => navigation.navigate('EditStock', { stock: item })}
+              >
+                <Text style={styles.adminBtnText}>✏️ Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.adminDeleteBtn}
+                onPress={() => handleAdminDelete(item._id)}
+              >
+                <Text style={styles.adminBtnText}>🗑️ Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -543,6 +588,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#757575',
     marginTop: 20,
+  },
+  adminActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    gap: 10
+  },
+  adminEditBtn: {
+    flex: 1,
+    backgroundColor: '#0284c7',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  adminDeleteBtn: {
+    flex: 1,
+    backgroundColor: '#dc2626',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  adminBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14
   }
 });
 

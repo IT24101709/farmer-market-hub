@@ -213,6 +213,45 @@ exports.assignAgent = async (req, res) => {
   }
 };
 
+// @desc    Assign third-party driver to delivery (agent only)
+// @route   PATCH /api/deliveries/:id/driver
+// @access  Private DeliveryAgent
+exports.assignDriver = async (req, res) => {
+  try {
+    const { driverName, driverContact, driverVehicle } = req.body;
+    const delivery = await Delivery.findById(req.params.id);
+
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found' });
+    }
+
+    const userId = uid(req.user);
+    const isAssignedAgent = String(delivery.agentId) === userId;
+
+    if (!isAssignedAgent && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Only assigned agent can assign a driver' });
+    }
+
+    if (delivery.status !== 'assigned') {
+      return res.status(400).json({ message: 'Can only assign a driver to an assigned delivery' });
+    }
+
+    delivery.driverName = driverName;
+    delivery.driverContact = driverContact;
+    delivery.driverVehicle = driverVehicle;
+    
+    await delivery.save();
+
+    res.status(200).json({
+      success: true,
+      data: delivery,
+      message: 'Driver assigned successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Update delivery status (agent only)
 // @route   PATCH /api/deliveries/:id/status
 // @access  Private DeliveryAgent

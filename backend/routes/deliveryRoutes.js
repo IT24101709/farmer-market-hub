@@ -8,6 +8,7 @@ const {
   getDeliveryById,
   getDeliveryByOrderId,
   assignAgent,
+  assignDriver,
   updateStatus,
   cancelDelivery
 } = require('../controllers/deliveryController');

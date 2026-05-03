@@ -6,12 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { getDeliveryById, updateDeliveryStatus } from '../../services/deliveryService';
+import { getDeliveryById, updateDeliveryStatus, assignDriverToDelivery } from '../../services/deliveryService';
 
 const statusColors = {
   pending: '#ca8a04',
@@ -45,11 +46,22 @@ const AgentDeliveryDetailScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  // Third-party driver states
+  const [driverName, setDriverName] = useState('');
+  const [driverContact, setDriverContact] = useState('');
+  const [driverVehicle, setDriverVehicle] = useState('');
+
   const load = async () => {
     try {
       if (!token || !deliveryId) return;
       const res = await getDeliveryById(deliveryId, token);
-      setDelivery(res.data || null);
+      const data = res.data || null;
+      setDelivery(data);
+      if (data) {
+        setDriverName(data.driverName || '');
+        setDriverContact(data.driverContact || '');
+        setDriverVehicle(data.driverVehicle || '');
+      }
     } catch (e) {
       console.error(e);
       if (e?.status === 401) logout();
@@ -111,6 +123,30 @@ const AgentDeliveryDetailScreen = ({ route, navigation }) => {
     );
   };
 
+  const handleAssignDriver = async () => {
+    if (!driverName.trim() || !driverContact.trim() || !driverVehicle.trim()) {
+      const msg = 'Please fill out all driver details.';
+      if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Validation Error', msg); }
+      return;
+    }
+    setBusy(true);
+    try {
+      await assignDriverToDelivery(
+        deliveryId, 
+        { driverName: driverName.trim(), driverContact: driverContact.trim(), driverVehicle: driverVehicle.trim() },
+        token
+      );
+      await load();
+      const successMsg = 'Driver assigned successfully.';
+      if (Platform.OS === 'web') { window.alert(successMsg); } else { Alert.alert('Success', successMsg); }
+    } catch (error) {
+      const errMsg = error.message || 'Failed to assign driver';
+      if (Platform.OS === 'web') { window.alert('Error: ' + errMsg); } else { Alert.alert('Error', errMsg); }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -169,27 +205,60 @@ const AgentDeliveryDetailScreen = ({ route, navigation }) => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Timeline</Text>
-        <Text style={styles.timestamp}>
-          Created: {formatDate(delivery.createdAt)}
-        </Text>
-        {delivery.assignedAt && (
-          <Text style={styles.timestamp}>
-            Assigned: {formatDate(delivery.assignedAt)}
-          </Text>
-        )}
-        {delivery.pickedUpAt && (
-          <Text style={styles.timestamp}>
-            Picked Up: {formatDate(delivery.pickedUpAt)}
-          </Text>
-        )}
-        {delivery.deliveredAt && (
-          <Text style={styles.timestamp}>
-            Delivered: {formatDate(delivery.deliveredAt)}
-          </Text>
+        <Text style={styles.timestamp}>Created: {formatDate(delivery.createdAt)}</Text>
+        {delivery.assignedAt && <Text style={styles.timestamp}>Assigned: {formatDate(delivery.assignedAt)}</Text>}
+        {delivery.pickedUpAt && <Text style={styles.timestamp}>Picked Up: {formatDate(delivery.pickedUpAt)}</Text>}
+        {delivery.deliveredAt && <Text style={styles.timestamp}>Delivered: {formatDate(delivery.deliveredAt)}</Text>}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Third-Party Driver</Text>
+        {delivery.status === 'assigned' && !delivery.driverName ? (
+          <View>
+            <Text style={styles.driverHint}>Assign a third-party driver to proceed.</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Driver Name"
+              value={driverName}
+              onChangeText={setDriverName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Contact Number"
+              keyboardType="phone-pad"
+              value={driverContact}
+              onChangeText={setDriverContact}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Vehicle Details (e.g. Van, ABC-1234)"
+              value={driverVehicle}
+              onChangeText={setDriverVehicle}
+            />
+            <TouchableOpacity 
+              style={[styles.driverBtn, busy && styles.disabled]} 
+              onPress={handleAssignDriver}
+              disabled={busy}
+            >
+              <Text style={styles.driverBtnText}>Save Driver Details</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View>
+            {delivery.driverName ? (
+              <>
+                <Text style={styles.driverVal}><Text style={styles.driverLbl}>Name:</Text> {delivery.driverName}</Text>
+                <Text style={styles.driverVal}><Text style={styles.driverLbl}>Contact:</Text> {delivery.driverContact}</Text>
+                <Text style={styles.driverVal}><Text style={styles.driverLbl}>Vehicle:</Text> {delivery.driverVehicle}</Text>
+              </>
+            ) : (
+              <Text style={styles.muted}>No driver assigned.</Text>
+            )}
+          </View>
         )}
       </View>
 
-      {delivery.status === 'assigned' && (
+      {delivery.status === 'assigned' && delivery.driverName && (
         <TouchableOpacity
           style={[styles.actionBtn, busy && styles.disabled]}
           onPress={() => handleStatusUpdate('in-transit')}
@@ -267,7 +336,28 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.6 },
   muted: { color: '#64748b', fontWeight: '600' },
   btn: { marginTop: 16, backgroundColor: '#2196F3', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: '800' }
+  btnText: { color: '#fff', fontWeight: '800' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    backgroundColor: '#f8fafc',
+    color: '#0f172a'
+  },
+  driverHint: { color: '#64748b', fontSize: 13, marginBottom: 12 },
+  driverBtn: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 4
+  },
+  driverBtnText: { color: '#fff', fontWeight: '700' },
+  driverLbl: { fontWeight: '700', color: '#475569' },
+  driverVal: { color: '#0f172a', marginBottom: 4 }
 });
 
 export default AgentDeliveryDetailScreen;

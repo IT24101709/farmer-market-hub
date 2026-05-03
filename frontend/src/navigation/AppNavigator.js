@@ -100,6 +100,8 @@ const AdminStack = () => (
     <Stack.Screen name="AdminReviews" component={AdminReviewsScreen} options={{ title: 'Reviews' }} />
     <Stack.Screen name="AdminReports" component={AdminReportsScreen} options={{ title: 'Reports' }} />
     <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Reviews' }} />
+    <Stack.Screen name="Marketplace" component={MarketplaceScreen} options={{ title: 'Marketplace (Admin)' }} />
+    <Stack.Screen name="EditStock" component={EditStockScreen} options={{ title: 'Edit Stock' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
   </Stack.Navigator>
 );

@@ -41,6 +41,18 @@ const deliverySchema = new mongoose.Schema({
   note: {
     type: String,
     default: ''
+  },
+  driverName: {
+    type: String,
+    default: null
+  },
+  driverContact: {
+    type: String,
+    default: null
+  },
+  driverVehicle: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true
