@@ -181,11 +181,26 @@ export const getDeliveryAgents = async (token) => {
 
 export const getAdminStocks = async (token, params = {}) => {
   try {
-    const queryParams = new URLSearchParams(params).toString();
-    const response = await axios.get(`${apiUrl}/stocks/all?${queryParams}`, {
-      headers: getAuthHeaders(token)
+    // Remove undefined/empty values to avoid "search=undefined" in query
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
+    );
+    const response = await axios.get(`${API_URL}/stocks`, {
+      headers: getAuthHeaders(token),
+      params: cleanParams
     });
-    return response.data;
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return {
+        products: data,
+        pagination: {
+          total: data.length,
+          page: Number(cleanParams.page || 1),
+          totalPages: 1
+        }
+      };
+    }
+    return data;
   } catch (error) {
     throw error.response?.data || error.message;
   }
@@ -215,7 +230,8 @@ export const toggleProductVisibility = async (stockId, token) => {
 
 export const removeProduct = async (stockId, reason, token) => {
   try {
-    const response = await axios.delete(`${API_URL}/stocks/${stockId}?reason=${encodeURIComponent(reason)}`, {
+    const deleteReason = reason || 'Removed by admin';
+    const response = await axios.delete(`${API_URL}/stocks/${stockId}?reason=${encodeURIComponent(deleteReason)}`, {
       headers: getAuthHeaders(token)
     });
     return response.data;

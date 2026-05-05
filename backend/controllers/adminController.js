@@ -2,6 +2,21 @@ const User = require('../models/User');
 const Stock = require('../models/Stock');
 const Order = require('../models/Order');
 const AuditLog = require('../models/AuditLog');
+const Notification = require('../models/Notification');
+
+const syncStockAvailability = (stock) => {
+  const quantity = Number(stock.quantity || 0);
+  const isAvailable = stock.status === 'Available' && quantity > 0 && !stock.isDeleted;
+
+  stock.availabilityStatus = isAvailable;
+  stock.visibility = isAvailable;
+
+  if (quantity <= 0) {
+    stock.status = 'Out of Stock';
+    stock.availabilityStatus = false;
+    stock.visibility = false;
+  }
+};
 
 // FSM-04 Freeze farmer stock access (separate from account suspend)
 exports.freezeFarmerStock = async (req, res) => {
@@ -79,6 +94,13 @@ await AuditLog.create({
       ip: req.ip,
       userAgent: req.get('User-Agent'),
       details: { reason, name: stock.name, farmer: stock.farmerId.name }
+    });
+
+    await Notification.create({
+      userId: stock.farmerId._id || stock.farmerId,
+      title: 'Stock Removed by Admin',
+      body: `Your stock listing for ${stock.name} was removed by an administrator. Reason: ${reason}.`,
+      type: 'system'
     });
 
     res.status(200).json({ 
@@ -375,9 +397,9 @@ exports.getDeliveryAgents = async (req, res) => {
     }
 
     const agents = await User.find(filter)
-      .select('-password profileDetails')
+      .select('-password')
       .sort({ 'profileDetails.maxCapacityKg': -1, createdAt: -1 });
-    res.status(200).json(agents);
+    res.status(200).json({ success: true, data: agents });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -563,11 +585,53 @@ exports.approveFarmerStock = async (req, res) => {
 // @access Private (Admin only)
 exports.getAdminStocks = async (req, res) => {
   try {
-    const stocks = await Stock.find()
-      .populate('farmerId', 'name email')
-      .populate('category', 'name')
-      .sort({ createdAt: -1 });
-    res.status(200).json(stocks);
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      category,
+      minPrice,
+      maxPrice,
+      status,
+      includeDeleted
+    } = req.query;
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const query = {};
+    if (includeDeleted !== 'true') query.isDeleted = false;
+    if (search) query.name = { $regex: String(search).trim(), $options: 'i' };
+    if (category) query.category = String(category).toLowerCase().trim();
+    if (status) query.status = status;
+    if (minPrice || maxPrice) {
+      query.pricePerKg = {};
+      if (minPrice) query.pricePerKg.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerKg.$lte = Number(maxPrice);
+    }
+
+    const [products, total] = await Promise.all([
+      Stock.find(query)
+        .populate('farmerId', 'name email profileDetails')
+        .populate('categoryId', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber)
+        .lean(),
+      Stock.countDocuments(query)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      products,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber)
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -595,6 +659,13 @@ exports.adminToggleProductVisibility = async (req, res) => {
       details: { newVisibility: stock.visibility }
     });
 
+    await Notification.create({
+      userId: stock.farmerId,
+      title: 'Stock Visibility Changed',
+      body: `The visibility of your stock ${stock.name} has been set to ${stock.visibility ? 'Visible' : 'Hidden'} by an administrator.`,
+      type: 'system'
+    });
+
     res.status(200).json({
       message: `Product visibility set to ${stock.visibility ? 'Visible' : 'Hidden'}`,
       stock
@@ -609,41 +680,44 @@ exports.adminToggleProductVisibility = async (req, res) => {
 // @access Private (Admin only)
 exports.adminRemoveProduct = async (req, res) => {
   try {
-    const { reason } = req.query;
-    if (!reason) {
-      return res.status(400).json({ message: 'Reason required' });
-    }
+    const reason = req.query.reason || req.body?.reason || 'Removed by admin';
 
     const stock = await Stock.findById(req.params.id);
     if (!stock) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Check active orders
-    const activeOrder = await Order.findOne({
-      'items.stockId': stock._id,
-      status: { $in: ['PENDING', 'CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT'] }
-    });
-    if (activeOrder) {
-      return res.status(400).json({ message: 'Cannot remove product with active orders' });
+    if (stock.isDeleted) {
+      return res.status(200).json({ message: 'Product already removed' });
     }
 
     stock.isDeleted = true;
     stock.visibility = false;
+    stock.availabilityStatus = false;
+    stock.status = 'Out of Stock';
     stock.removalReason = reason;
     await stock.save();
 
-    await AuditLog.create({
-      adminId: req.user.id,
-      stockId: stock._id,
-      action: 'REMOVE_PRODUCT',
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      details: { reason, product: stock.name }
-    });
+    await Promise.allSettled([
+      AuditLog.create({
+        adminId: req.user.id,
+        stockId: stock._id,
+        action: 'REMOVE_PRODUCT',
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        details: { reason, product: stock.name }
+      }),
+      Notification.create({
+        userId: stock.farmerId,
+        title: 'Product Removed by Admin',
+        body: `Your product ${stock.name} was removed from the marketplace. Reason: ${reason}.`,
+        type: 'system'
+      })
+    ]);
 
     res.status(200).json({ message: 'Product removed successfully' });
   } catch (error) {
+    console.error('Admin remove product error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -658,7 +732,28 @@ exports.adminBulkHideProducts = async (req, res) => {
 
 exports.adminOverridePrice = async (req, res) => {
   try {
-    res.status(200).json({ message: 'Price overridden' });
+    const price = Number(req.body.pricePerKg);
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ message: 'Price must be greater than 0.' });
+    }
+
+    const stock = await Stock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+    if (stock.isDeleted) return res.status(400).json({ message: 'Cannot update deleted stock.' });
+
+    stock.pricePerKg = Number(price.toFixed(2));
+    const updatedStock = await stock.save();
+
+    await AuditLog.create({
+      adminId: req.user.id,
+      stockId: updatedStock._id,
+      action: 'ADMIN_PRICE_OVERRIDE',
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: { pricePerKg: updatedStock.pricePerKg, name: updatedStock.name }
+    });
+
+    res.status(200).json({ message: 'Price updated successfully', stock: updatedStock });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -674,7 +769,58 @@ exports.applyGlobalVisibilityRules = async (req, res) => {
 
 exports.adminUpdateStock = async (req, res) => {
   try {
-    res.status(200).json({ message: 'Stock updated' });
+    const stock = await Stock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+    if (stock.isDeleted) return res.status(400).json({ message: 'Cannot update deleted stock.' });
+
+    const allowedFields = [
+      'name',
+      'category',
+      'unit',
+      'description',
+      'harvestDate',
+      'expiryDate',
+      'quantity',
+      'pricePerKg',
+      'qualityGrade',
+      'status'
+    ];
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        stock[field] = req.body[field];
+      }
+    });
+
+    if (req.body.pricePerKg !== undefined) {
+      const price = Number(req.body.pricePerKg);
+      if (!Number.isFinite(price) || price <= 0) {
+        return res.status(400).json({ message: 'Price must be greater than 0.' });
+      }
+      stock.pricePerKg = Number(price.toFixed(2));
+    }
+
+    if (req.body.quantity !== undefined) {
+      const quantity = Number(req.body.quantity);
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        return res.status(400).json({ message: 'Quantity must be 0 or a positive number.' });
+      }
+      stock.quantity = quantity;
+    }
+
+    syncStockAvailability(stock);
+    const updatedStock = await stock.save();
+
+    await AuditLog.create({
+      adminId: req.user.id,
+      stockId: updatedStock._id,
+      action: 'ADMIN_STOCK_UPDATE',
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: { name: updatedStock.name, quantity: updatedStock.quantity, pricePerKg: updatedStock.pricePerKg }
+    });
+
+    res.status(200).json({ message: 'Stock updated successfully', stock: updatedStock });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

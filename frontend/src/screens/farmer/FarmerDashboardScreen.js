@@ -14,16 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { getDashboardInsights, getStockStats } from '../../services/farmerService';
-
-const NAV_ITEMS = [
-  { label: 'Dashboard', screen: 'FarmerDashboard' },
-  { label: 'Add Stock', screen: 'AddStock' },
-  { label: 'View Stock', screen: 'StockList' },
-  { label: 'Orders', screen: 'MyOrders' },
-  { label: 'Reviews', screen: 'Reviews' },
-  { label: 'Alerts', screen: 'Notifications' },
-  { label: 'Profile', screen: 'FarmerProfile' }
-];
+import FarmerNavBar from '../../components/FarmerNavBar';
 
 const FARM_IMAGE = {
   uri: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1800&q=80'
@@ -93,18 +84,7 @@ const FarmerDashboardScreen = ({ navigation }) => {
     fetchData();
   };
 
-  const handleNavigation = (item) => {
-    if (item.screen !== 'FarmerDashboard') {
-      if (item.screen === 'Reviews') {
-        navigation.navigate('Reviews', {
-          farmerId: user?._id || user?.id,
-          farmerName: user?.name || 'My Farm'
-        });
-        return;
-      }
-      navigation.navigate(item.screen);
-    }
-  };
+
 
   const severityMix = useMemo(() => {
     const mix = insights?.severityMix || {};
@@ -142,27 +122,7 @@ const FarmerDashboardScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <ImageBackground source={FARM_IMAGE} style={styles.background} resizeMode="cover">
         <View style={styles.backdrop}>
-          <View style={styles.navBar}>
-            <View style={styles.brandPill}>
-              <Text style={styles.brandIcon}>🌱</Text>
-              <Text style={styles.brandText}>Stock Manager</Text>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabs}>
-              {NAV_ITEMS.map((item) => {
-                const active = item.screen === 'FarmerDashboard';
-                return (
-                  <TouchableOpacity
-                    key={item.label}
-                    style={[styles.navTab, active && styles.navTabActive]}
-                    onPress={() => handleNavigation(item)}
-                  >
-                    <Text style={[styles.navTabText, active && styles.navTabTextActive]}>{item.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+          <FarmerNavBar navigation={navigation} currentScreen="FarmerDashboard" />
 
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -404,57 +364,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.88)',
     fontWeight: '600',
     fontSize: 14
-  },
-  navBar: {
-    minHeight: 76,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(129, 211, 166, 0.92)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.35)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14
-  },
-  brandPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)'
-  },
-  brandIcon: {
-    color: '#15803d',
-    fontWeight: '900',
-    fontSize: 11
-  },
-  brandText: {
-    color: '#13713a',
-    fontSize: 18,
-    fontWeight: '900'
-  },
-  navTabs: {
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 8
-  },
-  navTab: {
-    minWidth: 96,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center'
-  },
-  navTabActive: {
-    backgroundColor: '#ffffff'
-  },
-  navTabText: {
-    color: 'rgba(255, 255, 255, 0.92)',
-    fontWeight: '800'
-  },
-  navTabTextActive: {
-    color: '#15803d'
   },
   scrollContent: {
     paddingHorizontal: 18,

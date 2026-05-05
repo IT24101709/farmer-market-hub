@@ -3,6 +3,7 @@ const Stock = require('../models/Stock');
 const { CATEGORY_ENUM } = require('../utils/stockCategory');
 const StockHistory = require('../models/StockHistory');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const fs = require('fs');
 const path = require('path');
 const { expiryFromHarvest, attachSpoilageMeta } = require('../utils/shelfLife');
@@ -211,9 +212,10 @@ exports.getStockById = async (req, res) => {
       return res.status(404).json({ message: 'Stock not found' });
     }
 
-    // Check if it belongs to farmer
-    if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Forbidden: only the owning farmer can access this stock record.' });
+    // Check if it belongs to farmer or is admin
+    const isAdmin = req.user.role === 'Admin';
+    if (!isAdmin && stock.farmerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer or an admin can access this stock record.' });
     }
 
     const payload = attachSpoilageMeta(stock.toObject ? stock.toObject() : stock, new Date());
@@ -238,8 +240,9 @@ exports.updateStock = async (req, res) => {
       return res.status(404).json({ message: '❌ Stock not found' });
     }
 
-    if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Forbidden: only the owning farmer can update this stock record.' });
+    const isAdmin = req.user.role === 'Admin';
+    if (!isAdmin && stock.farmerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer or an admin can update this stock record.' });
     }
 
     if (stock.isDeleted) {
@@ -330,6 +333,13 @@ syncAvailabilityFields(stock);
         details: { name: stock.name, reason: 'Quantity reached zero' }
       });
 
+      await Notification.create({
+        userId: req.user.id,
+        title: 'Stock Auto-Deleted',
+        body: `Your stock listing for ${stock.name} was automatically removed because the quantity reached zero.`,
+        type: 'system'
+      });
+
       return res.status(200).json({ 
         message: `✅ Stock for ${stock.name} quantity reached zero and was auto-deleted.`,
         stock: null 
@@ -371,8 +381,9 @@ exports.deleteStock = async (req, res) => {
       return res.status(404).json({ message: '❌ Stock not found' });
     }
 
-    if (stock.farmerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Forbidden: only the owning farmer can delete this stock record.' });
+    const isAdmin = req.user.role === 'Admin';
+    if (!isAdmin && stock.farmerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden: only the owning farmer or an admin can delete this stock record.' });
     }
 
     if (stock.isDeleted) {
@@ -524,6 +535,13 @@ exports.updateQuantity = async (req, res) => {
         details: { name: stock.name, reason: 'Quantity reached zero via quick update' }
       });
 
+      await Notification.create({
+        userId: req.user.id,
+        title: 'Stock Auto-Deleted',
+        body: `Your stock listing for ${stock.name} was automatically removed because the quantity reached zero.`,
+        type: 'system'
+      });
+
       return res.status(200).json({
         message: 'Quantity updated to zero. Stock auto-deleted.',
         stock: null
@@ -627,7 +645,7 @@ exports.removeExpiredStock = async (req, res) => {
 // @desc    Bulk add stocks
 // @route   POST /api/stocks/bulk
 // @access  Private (Farmer only)
-exports.bulkAddStocks = async (req, res) => {
+exports.bulkAddStocks = async (req, res, next) => {
   try {
     // Expects an array of stock objects in req.body.stocks
     const { stocks } = req.body;
@@ -672,14 +690,14 @@ const stocksToInsert = stocks.map((stock) => {
     const insertedStocks = await Stock.insertMany(stocksToInsert);
     res.status(201).json({ message: `Successfully added ${insertedStocks.length} items`, insertedStocks });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
 // @desc    Bulk update stocks
 // @route   PUT /api/stocks/bulk
 // @access  Private (Farmer only)
-exports.bulkUpdateStocks = async (req, res) => {
+exports.bulkUpdateStocks = async (req, res, next) => {
   try {
     // Expects an array of objects: { _id, quantity, pricePerKg, ... }
     const { stocks } = req.body;
@@ -722,7 +740,7 @@ exports.bulkUpdateStocks = async (req, res) => {
 
     res.status(200).json({ message: `Successfully updated ${updatedCount} items` });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
@@ -774,6 +792,13 @@ exports.deactivateStockAdmin = async (req, res) => {
     stock.availabilityStatus = false;
     stock.visibility = false;
     await stock.save();
+
+    await Notification.create({
+      userId: stock.farmerId,
+      title: 'Stock Deactivated by Admin',
+      body: `Your stock listing for ${stock.name} has been deactivated by an administrator.`,
+      type: 'system'
+    });
 
     res.status(200).json({ message: 'Stock deactivated successfully', stock });
   } catch (error) {

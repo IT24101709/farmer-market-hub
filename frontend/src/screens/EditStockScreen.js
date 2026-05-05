@@ -19,6 +19,7 @@ import {
   getStockById,
   updateStock
 } from '../services/stockService';
+import FarmerNavBar from '../components/FarmerNavBar';
 
 /** Browsers must send Blob/File — native uses { uri, name, type }. */
 const appendStockImageToFormData = async (formData, image) => {
@@ -52,7 +53,7 @@ const appendStockImageToFormData = async (formData, image) => {
 
 const EditStockScreen = ({ route, navigation }) => {
   const stockId = route.params?.stockId || route.params?.stock?._id;
-  const { token, logout } = useContext(AuthContext);
+  const { token, user, logout } = useContext(AuthContext);
   const [stock, setStock] = useState(route.params?.stock || null);
   const [quantity, setQuantity] = useState('');
   const [pricePerKg, setPricePerKg] = useState('');
@@ -61,6 +62,10 @@ const EditStockScreen = ({ route, navigation }) => {
   const [newImage, setNewImage] = useState(null);
   const [loading, setLoading] = useState(!route.params?.stock);
   const [saving, setSaving] = useState(false);
+  const isAdmin = user?.role === 'Admin' || user?.role === 'admin';
+  const returnToStockList = () => {
+    navigation.navigate(isAdmin ? 'Marketplace' : 'StockList');
+  };
 
   useEffect(() => {
     const loadStock = async () => {
@@ -165,7 +170,7 @@ const EditStockScreen = ({ route, navigation }) => {
         await updateStock(idToUpdate, payload, token);
 
         window.alert('Stock updated successfully.');
-        navigation.navigate('StockList');
+        returnToStockList();
       } catch (error) {
         if (error.status === 401) logout();
         window.alert('Error: ' + (error.message || 'Failed to update stock.'));
@@ -212,7 +217,7 @@ const EditStockScreen = ({ route, navigation }) => {
               await updateStock(idToUpdate, payload, token);
 
               Alert.alert('Success', 'Stock updated successfully.', [
-                { text: 'OK', onPress: () => navigation.navigate('StockList') }
+                { text: 'OK', onPress: returnToStockList }
               ]);
             } catch (error) {
               if (error.status === 401) logout();
@@ -236,6 +241,7 @@ const EditStockScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {!isAdmin && <FarmerNavBar navigation={navigation} currentScreen="EditStock" />}
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Edit Stock</Text>
         <Text style={styles.subtitle}>{stock.name || stock.vegetableName || 'Stock item'}</Text>

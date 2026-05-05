@@ -24,6 +24,7 @@ import FarmerProfileScreen from '../screens/farmer/FarmerProfileScreen';
 import MyOrdersScreen from '../screens/farmer/MyOrdersScreen';
 import OrderDetailsScreen from '../screens/farmer/OrderDetailsScreen';
 import PaymentHistoryScreen from '../screens/farmer/PaymentHistoryScreen';
+import FarmerNotificationsScreen from '../screens/farmer/FarmerNotificationsScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 import CartScreen from '../screens/customer/CartScreen';
 import CustomerOrdersScreen from '../screens/customer/CustomerOrdersScreen';
@@ -85,6 +86,7 @@ const FarmerStack = () => (
     <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: 'Reviews' }} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+    <Stack.Screen name="FarmerNotifications" component={FarmerNotificationsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} options={{ title: 'Payment Details' }} />
   </Stack.Navigator>
 );

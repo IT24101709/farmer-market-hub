@@ -14,6 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { confirmFarmerOrder, getFarmerOrders } from '../../services/farmerService';
+import FarmerNavBar from '../../components/FarmerNavBar';
 
 const statusColor = (status) => {
   // Check both new UPPERCASE and legacy status names
@@ -237,6 +238,7 @@ const MyOrdersScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <FarmerNavBar navigation={navigation} currentScreen="MyOrders" />
       <View style={styles.header}>
         <Text style={styles.title}>My orders</Text>
         <Text style={styles.subtitle}>From customers who bought your produce</Text>

@@ -12,15 +12,7 @@ import {
   View
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
-
-const NAV_ITEMS = [
-  { label: 'Dashboard', screen: 'FarmerDashboard' },
-  { label: 'Add Stock', screen: 'AddStock' },
-  { label: 'View Stock', screen: 'StockList' },
-  { label: 'Payment Details', screen: 'PaymentHistory' },
-  { label: 'Orders', screen: 'MyOrders' },
-  { label: 'Profile', screen: 'FarmerProfile' }
-];
+import FarmerNavBar from '../../components/FarmerNavBar';
 
 const FARM_IMAGE = {
   uri: 'https://images.unsplash.com/photo-1492496913980-501348b61469?auto=format&fit=crop&w=1800&q=80'
@@ -64,15 +56,17 @@ const FarmerProfileScreen = ({ navigation }) => {
 
   const validateProfile = () => {
     const nextErrors = {};
+    
+    const formattedDistrict = form.district ? form.district.trim().charAt(0).toUpperCase() + form.district.trim().slice(1).toLowerCase() : '';
 
     if (!form.name.trim()) nextErrors.name = 'Full name is required.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) nextErrors.email = 'Enter a valid email address.';
     if (form.phone && !/^[0-9+\-\s]{7,15}$/.test(form.phone.trim())) nextErrors.phone = 'Enter a valid phone number.';
-    if (form.district && !['North', 'South', 'East', 'West', 'Central'].includes(form.district)) {
+    if (formattedDistrict && !['North', 'South', 'East', 'West', 'Central'].includes(formattedDistrict)) {
       nextErrors.district = 'Use North, South, East, West, or Central.';
     }
-    if (form.address.length > 200) nextErrors.address = 'Address must be under 200 characters.';
-    if (form.businessName.length > 100) nextErrors.businessName = 'Farm name must be under 100 characters.';
+    if ((form.address || '').length > 200) nextErrors.address = 'Address must be under 200 characters.';
+    if ((form.businessName || '').length > 100) nextErrors.businessName = 'Farm name must be under 100 characters.';
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -90,10 +84,10 @@ const FarmerProfileScreen = ({ navigation }) => {
         name: form.name.trim(),
         email: form.email.trim(),
         profileDetails: {
-          phone: form.phone.trim(),
-          address: form.address.trim(),
-          businessName: form.businessName.trim(),
-          region: form.district || undefined
+          phone: (form.phone || '').trim(),
+          address: (form.address || '').trim(),
+          businessName: (form.businessName || '').trim(),
+          region: form.district ? form.district.trim().charAt(0).toUpperCase() + form.district.trim().slice(1).toLowerCase() : undefined
         }
       });
       setEditing(false);
@@ -105,15 +99,12 @@ const FarmerProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleNavigation = (item) => {
-    if (item.screen !== 'FarmerProfile') navigation.navigate(item.screen);
-  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground source={FARM_IMAGE} style={styles.background} resizeMode="cover">
         <View style={styles.backdrop}>
-          <StockNav activeScreen="FarmerProfile" onNavigate={handleNavigation} />
+          <FarmerNavBar navigation={navigation} currentScreen="FarmerProfile" />
 
           <ScrollView contentContainerStyle={styles.content}>
             <View style={styles.profilePanel}>
@@ -185,54 +176,11 @@ const ProfileField = ({ label, value, editable, error, onChangeText, keyboardTyp
   </View>
 );
 
-const StockNav = ({ activeScreen, onNavigate }) => (
-  <View style={styles.navBar}>
-    <View style={styles.brandPill}>
-      <Text style={styles.brandIcon}>🌱</Text>
-      <Text style={styles.brandText}>Stock Manager</Text>
-    </View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabs}>
-      {NAV_ITEMS.map(item => (
-        <TouchableOpacity
-          key={item.label}
-          style={[styles.navTab, item.screen === activeScreen && styles.navTabActive]}
-          onPress={() => onNavigate(item)}
-        >
-          <Text style={[styles.navTabText, item.screen === activeScreen && styles.navTabTextActive]}>{item.label}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#103d2b' },
   background: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(22, 101, 52, 0.54)' },
-  navBar: {
-    minHeight: 76,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(129, 211, 166, 0.92)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14
-  },
-  brandPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.58)'
-  },
-  brandIcon: { marginRight: 8 },
-  brandText: { color: '#13713a', fontSize: 18, fontWeight: '900' },
-  navTabs: { alignItems: 'center', gap: 12, paddingHorizontal: 8 },
-  navTab: { minWidth: 96, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 6, alignItems: 'center' },
-  navTabActive: { backgroundColor: '#fff' },
-  navTabText: { color: 'rgba(255,255,255,0.92)', fontWeight: '800' },
-  navTabTextActive: { color: '#15803d' },
   content: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 40, alignItems: 'center' },
   profilePanel: {
     width: '68%',

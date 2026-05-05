@@ -28,11 +28,16 @@ const reviewSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 1,
-    max: 5
+    max: 5,
+    validate: {
+      validator: Number.isInteger,
+      message: 'Rating must be a whole number between 1 and 5.'
+    }
   },
   comment: {
     type: String,
     trim: true,
+    minlength: 3,
     maxlength: 600,
     default: ''
   },

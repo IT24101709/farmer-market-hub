@@ -23,6 +23,7 @@ import {
   toggleStockVisibility,
   updateStockAvailability
 } from '../services/stockService';
+import FarmerNavBar from '../components/FarmerNavBar';
 
 const SORT_OPTIONS = [
   { key: 'newest', label: 'Newest' },
@@ -294,6 +295,7 @@ const StockListScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <FarmerNavBar navigation={navigation} currentScreen="StockList" />
       <View style={styles.header}>
         <Text style={styles.title}>My vegetable stock</Text>
         <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('AddStock')}>

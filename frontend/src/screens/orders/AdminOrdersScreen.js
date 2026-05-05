@@ -22,6 +22,7 @@ const statusColors = {
   READY_FOR_DELIVERY: '#047857',
   ASSIGNED: '#047857',
   IN_TRANSIT: '#047857',
+  FAILED_DELIVERY: '#b91c1c',
   Pending: '#ca8a04',
   Confirmed: '#15803d',
   Cancelled: '#b91c1c',
@@ -45,7 +46,17 @@ const formatDate = (d) => {
   }
 };
 
-const STATUS_FILTERS = ['All', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED'];
+const STATUS_FILTERS = [
+  'All',
+  'PENDING',
+  'CONFIRMED',
+  'READY_FOR_DELIVERY',
+  'ASSIGNED',
+  'IN_TRANSIT',
+  'DELIVERED',
+  'CANCELLED',
+  'FAILED_DELIVERY'
+];
 
 const AdminOrdersScreen = ({ navigation }) => {
   const { token, logout } = useContext(AuthContext);
@@ -59,7 +70,7 @@ const AdminOrdersScreen = ({ navigation }) => {
   const load = async () => {
     try {
       if (!token) return;
-      const res = await getAdminOrders(token);
+      const res = await getAdminOrders(token, { limit: 200 });
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
@@ -101,10 +112,9 @@ const AdminOrdersScreen = ({ navigation }) => {
   const handleStatusChange = async (orderId, newStatus) => {
     setActionLoading(orderId);
     try {
-      // Normalize to lowercase — backend updateOrderStatus accepts lowercase
-      await updateOrderStatus(orderId, newStatus.toLowerCase(), null, token);
+      await updateOrderStatus(orderId, newStatus, null, token);
       await load();
-      if (newStatus === 'CONFIRMED') {
+      if (newStatus === 'READY_FOR_DELIVERY') {
         navigation.navigate('AdminDeliveries');
       }
     } catch (e) {
@@ -119,6 +129,8 @@ const AdminOrdersScreen = ({ navigation }) => {
     const shortId = item._id ? String(item._id).slice(-8).toUpperCase() : '—';
     const isPending = item.status === 'PENDING' || item.status === 'Pending';
     const isConfirmed = item.status === 'CONFIRMED' || item.status === 'Confirmed';
+    const isReady = item.status === 'READY_FOR_DELIVERY';
+    const isInTransit = item.status === 'IN_TRANSIT';
     const isLoading = actionLoading === item._id;
 
     return (
@@ -144,6 +156,9 @@ const AdminOrdersScreen = ({ navigation }) => {
         </View>
         
         <Text style={styles.customer}>{item.customerName}</Text>
+        <Text style={styles.customerMeta}>
+          {item.customerId?.email || 'Customer email not available'}
+        </Text>
         
         <Text style={styles.items} numberOfLines={1}>
           {item.items?.map(i => i.product).join(', ') || 'No items'}
@@ -167,6 +182,33 @@ const AdminOrdersScreen = ({ navigation }) => {
                 onPress={() => handleStatusChange(item._id, 'CONFIRMED')}
               >
                 <Text style={styles.confirmBtnText}>Confirm</Text>
+              </TouchableOpacity>
+            )}
+
+            {isConfirmed && (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.confirmBtn]}
+                onPress={() => handleStatusChange(item._id, 'READY_FOR_DELIVERY')}
+              >
+                <Text style={styles.confirmBtnText}>Ready</Text>
+              </TouchableOpacity>
+            )}
+
+            {isReady && (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.confirmBtn]}
+                onPress={() => navigation.navigate('AdminDeliveries')}
+              >
+                <Text style={styles.confirmBtnText}>Assign Delivery</Text>
+              </TouchableOpacity>
+            )}
+
+            {isInTransit && (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.confirmBtn]}
+                onPress={() => handleStatusChange(item._id, 'DELIVERED')}
+              >
+                <Text style={styles.confirmBtnText}>Delivered</Text>
               </TouchableOpacity>
             )}
             
@@ -288,11 +330,12 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 16 },
   statusText: { fontWeight: '800', fontSize: 12 },
   customer: { marginTop: 8, fontWeight: '700', color: '#424242', fontSize: 15 },
+  customerMeta: { marginTop: 2, color: '#757575', fontSize: 12 },
   items: { marginTop: 4, color: '#757575', fontSize: 13 },
   total: { marginTop: 8, fontWeight: '900', color: '#f57c00', fontSize: 18 },
   date: { marginTop: 4, color: '#9e9e9e', fontSize: 12 },
-  actions: { flexDirection: 'row', marginTop: 12 },
-  actionBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, marginRight: 8 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
+  actionBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   confirmBtn: { backgroundColor: '#e8f5e9' },
   confirmBtnText: { color: '#2e7d32', fontWeight: '700', fontSize: 13 },
   cancelBtn: { backgroundColor: '#ffebee' },

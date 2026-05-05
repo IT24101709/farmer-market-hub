@@ -1,16 +1,29 @@
 // Centralized configuration for the frontend
-// Set EXPO_PUBLIC_API_PORT=5001 (or EXPO_PUBLIC_API_URL=...) in frontend/.env if your backend uses a non-default port.
+// Set EXPO_PUBLIC_API_PORT=... (or EXPO_PUBLIC_API_URL=...) in frontend/.env if your backend uses a different port.
 
 const PROD_API = 'https://farmers-market-hub-api.onrender.com/api';
+
+function nativePlatform() {
+  try {
+    // Lazy require keeps this config usable in web/node contexts.
+    return require('react-native').Platform?.OS;
+  } catch {
+    return null;
+  }
+}
 
 function devApiPort() {
   const fromEnv =
     typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_PORT;
   const trimmed = fromEnv != null ? String(fromEnv).trim() : '';
-  return trimmed || '5000';
+  return trimmed || '5002';
 }
 
 function defaultDevApi() {
+  const platform = nativePlatform();
+  if (platform === 'android') {
+    return `http://10.0.2.2:${devApiPort()}/api`;
+  }
   return `http://localhost:${devApiPort()}/api`;
 }
 

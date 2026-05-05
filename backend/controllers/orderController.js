@@ -198,7 +198,11 @@ exports.getMyOrders = async (req, res) => {
 // @access  Private
 exports.getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id)
+      .populate('customerId', 'name email profileDetails')
+      .populate('deliveryAgentId', 'name email profileDetails')
+      .populate('items.stockId', 'name category unit pricePerKg imageUrl status availabilityStatus')
+      .populate('items.farmerId', 'name email profileDetails');
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -736,34 +740,65 @@ res.status(200).json({
 // @access  Private Admin
 exports.updateOrderStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, notes } = req.body;
     const order = await Order.findById(req.params.id);
     
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Normalize to lowercase for consistent validation (frontend may send UPPERCASE)
-    const normalizedStatus = (status || '').toString().toLowerCase();
-    const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
-    if (!normalizedStatus || !validStatuses.includes(normalizedStatus)) {
+    const statusAliases = {
+      pending: 'PENDING',
+      confirmed: 'CONFIRMED',
+      cancelled: 'CANCELLED',
+      canceled: 'CANCELLED',
+      ready_for_delivery: 'READY_FOR_DELIVERY',
+      ready: 'READY_FOR_DELIVERY',
+      assigned: 'ASSIGNED',
+      in_transit: 'IN_TRANSIT',
+      delivered: 'DELIVERED',
+      completed: 'DELIVERED',
+      failed_delivery: 'FAILED_DELIVERY'
+    };
+
+    const rawStatus = (status || '').toString().trim();
+    const normalizedKey = rawStatus.toLowerCase().replace(/[\s-]+/g, '_');
+    const nextStatus = statusAliases[normalizedKey] || rawStatus.toUpperCase();
+    const validStatuses = [
+      'PENDING',
+      'CONFIRMED',
+      'CANCELLED',
+      'READY_FOR_DELIVERY',
+      'ASSIGNED',
+      'IN_TRANSIT',
+      'DELIVERED',
+      'FAILED_DELIVERY'
+    ];
+    if (!validStatuses.includes(nextStatus)) {
       return res.status(400).json({ message: `Invalid status. Valid: ${validStatuses.join(', ')}` });
     }
 
     const oldStatus = order.status;
     
     // If cancelling, restore stock
-    if (normalizedStatus === 'cancelled' && oldStatus !== 'CANCELLED' && oldStatus !== 'cancelled') {
+    if (nextStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
       await restoreDeductedStock(order);
     }
 
-    // Update order status (store as uppercase for DB consistency)
-    order.status = normalizedStatus.toUpperCase();
-    order.legacyStatus = normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+    order.status = nextStatus;
+    if (nextStatus === 'CANCELLED') order.legacyStatus = 'Cancelled';
+    else if (nextStatus === 'DELIVERED') order.legacyStatus = 'Delivered';
+    else if (nextStatus === 'IN_TRANSIT') order.legacyStatus = 'Shipped';
+    else if (nextStatus === 'PENDING') order.legacyStatus = 'Pending';
+    else order.legacyStatus = 'Processing';
+    if (notes) order.deliveryNotes = notes;
+    if (nextStatus === 'DELIVERED' && !order.deliveredAt) order.deliveredAt = new Date();
     await order.save();
 
-    // Auto-create Delivery record when status becomes 'confirmed'
-    if (normalizedStatus === 'confirmed' && oldStatus !== 'CONFIRMED' && oldStatus !== 'confirmed') {
+    if (
+      ['CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT'].includes(nextStatus) &&
+      oldStatus !== nextStatus
+    ) {
       await ensureDeliveryForOrder(order);
     }
 
@@ -771,7 +806,7 @@ exports.updateOrderStatus = async (req, res) => {
     if (order.customerId) {
       await notifyUser(String(order.customerId), {
         title: 'Order status updated',
-        body: `Order #${String(order._id).slice(-6).toUpperCase()} is now ${normalizedStatus}.`,
+        body: `Order #${String(order._id).slice(-6).toUpperCase()} is now ${nextStatus}.`,
         orderId: order._id,
         type: 'order_status'
       });
@@ -780,7 +815,7 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(200).json({
       success: true,
       data: order,
-      message: `Order status updated to ${normalizedStatus}`
+      message: `Order status updated to ${nextStatus}`
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -792,15 +827,40 @@ exports.updateOrderStatus = async (req, res) => {
 // @access  Private Admin
 exports.getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find()
+    const { status, search, page = 1, limit = 100 } = req.query;
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 200);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const filter = {};
+    if (status) filter.status = String(status).toUpperCase();
+    if (search && String(search).trim()) {
+      const q = String(search).trim();
+      filter.$or = [{ customerName: { $regex: q, $options: 'i' } }];
+      if (/^[a-fA-F0-9]{24}$/.test(q)) {
+        filter.$or.push({ _id: q });
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
       .populate('customerId', 'name email')
-      .populate('farmerId', 'name email')
-      .sort({ createdAt: -1 });
+        .populate('deliveryAgentId', 'name email')
+        .populate('items.stockId', 'name category unit pricePerKg status availabilityStatus')
+        .populate('items.farmerId', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber),
+      Order.countDocuments(filter)
+    ]);
     
     res.status(200).json({ 
       success: true, 
-      count: orders.length, 
-      data: orders 
+      count: orders.length,
+      total,
+      page: pageNumber,
+      pages: Math.ceil(total / limitNumber),
+      data: orders
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

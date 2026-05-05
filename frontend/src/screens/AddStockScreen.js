@@ -23,15 +23,7 @@ import { AuthContext } from '../context/AuthContext';
 import { getCategories } from '../services/categoryService';
 import { bulkAddStocks, createStock } from '../services/stockService';
 import { resolveStockCategorySlug } from '../utils/stockCategory';
-
-const NAV_ITEMS = [
-  { label: 'Dashboard', screen: 'FarmerDashboard' },
-  { label: 'Add Stock', screen: 'AddStock' },
-  { label: 'View Stock', screen: 'StockList' },
-  { label: 'Payment Details', screen: 'PaymentHistory' },
-  { label: 'Orders', screen: 'MyOrders' },
-  { label: 'Profile', screen: 'FarmerProfile' }
-];
+import FarmerNavBar from '../components/FarmerNavBar';
 
 const FARM_IMAGE = {
   uri: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=1800&q=80'
@@ -369,6 +361,15 @@ const AddStockScreen = ({ navigation }) => {
         showToast('Validation', `Fill name, quantity, price, and expiry in bulk row ${i + 1}.`);
         return;
       }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.expiryDate.trim())) {
+        showToast('Validation', `Expiry date must be in YYYY-MM-DD format in bulk row ${i + 1}.`);
+        return;
+      }
+      const expDateObj = new Date(row.expiryDate.trim());
+      if (Number.isNaN(expDateObj.getTime())) {
+        showToast('Validation', `Invalid expiry date in bulk row ${i + 1}.`);
+        return;
+      }
       const cat = row.categoryId ? categories.find((c) => c._id === row.categoryId) : null;
       validStocks.push({
         categoryId: row.categoryId || undefined,
@@ -400,15 +401,11 @@ const AddStockScreen = ({ navigation }) => {
     }
   };
 
-  const handleNavigation = (item) => {
-    if (item.screen !== 'AddStock') navigation.navigate(item.screen);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground source={FARM_IMAGE} style={styles.background} resizeMode="cover">
         <View style={styles.backdrop}>
-          <StockNav activeScreen="AddStock" onNavigate={handleNavigation} />
+          <FarmerNavBar navigation={navigation} currentScreen="AddStock" />
 
           <ScrollView contentContainerStyle={styles.content}>
             <View style={styles.formPanel}>
@@ -742,54 +739,11 @@ const Field = ({ label, error, children, wide }) => (
   </View>
 );
 
-const StockNav = ({ activeScreen, onNavigate }) => (
-  <View style={styles.navBar}>
-    <View style={styles.brandPill}>
-      <Text style={styles.brandIcon}>Stock</Text>
-      <Text style={styles.brandText}>Stock Manager</Text>
-    </View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabs}>
-      {NAV_ITEMS.map(item => (
-        <TouchableOpacity
-          key={item.label}
-          style={[styles.navTab, item.screen === activeScreen && styles.navTabActive]}
-          onPress={() => onNavigate(item)}
-        >
-          <Text style={[styles.navTabText, item.screen === activeScreen && styles.navTabTextActive]}>{item.label}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#103d2b' },
   background: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(6, 25, 16, 0.45)' },
-  navBar: {
-    minHeight: 76,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(129, 211, 166, 0.92)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14
-  },
-  brandPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.58)'
-  },
-  brandIcon: { color: '#15803d', fontSize: 11, fontWeight: '900', marginRight: 8 },
-  brandText: { color: '#13713a', fontSize: 18, fontWeight: '900' },
-  navTabs: { alignItems: 'center', gap: 12, paddingHorizontal: 8 },
-  navTab: { minWidth: 96, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 6, alignItems: 'center' },
-  navTabActive: { backgroundColor: '#fff' },
-  navTabText: { color: 'rgba(255,255,255,0.92)', fontWeight: '800' },
-  navTabTextActive: { color: '#15803d' },
   content: { paddingTop: 40, paddingBottom: 50, alignItems: 'center' },
   formPanel: {
     width: '72%',

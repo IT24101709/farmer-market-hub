@@ -16,8 +16,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { CartContext } from '../../context/CartContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import { getMarketProducts } from '../../services/marketService';
-import { getAdminStocks, deactivateStock } from '../../services/adminService';
-import { deleteStock } from '../../services/stockService';
+import { getAdminStocks, deactivateStock, removeProduct } from '../../services/adminService';
 import { resolveStockImageUrl } from '../../config';
 import { Alert, Platform } from 'react-native';
 
@@ -118,7 +117,7 @@ const MarketplaceScreen = ({ navigation }) => {
     const msg = 'Are you sure you want to delete this product?';
     if (Platform.OS === 'web') {
       if (!window.confirm(msg)) return;
-      deleteStock(stockId, token)
+      removeProduct(stockId, 'Removed from admin marketplace', token)
         .then(() => fetchProducts(1, true))
         .catch(err => window.alert(err.message || 'Failed to delete'));
     } else {
@@ -129,7 +128,7 @@ const MarketplaceScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteStock(stockId, token);
+              await removeProduct(stockId, 'Removed from admin marketplace', token);
               fetchProducts(1, true);
             } catch (err) {
               Alert.alert('Error', err.message || 'Failed to delete');

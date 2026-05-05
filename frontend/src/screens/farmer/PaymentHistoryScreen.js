@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
+import FarmerNavBar from '../../components/FarmerNavBar';
 import axios from 'axios';
 import getEnvVars from '../../config';
 
@@ -36,7 +37,7 @@ const StatCard = ({ label, value, color }) => (
   </View>
 );
 
-const PaymentHistoryScreen = () => {
+const PaymentHistoryScreen = ({ navigation }) => {
   const { token, logout } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +125,7 @@ const PaymentHistoryScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <FarmerNavBar navigation={navigation} currentScreen="PaymentHistory" />
       {/* Revenue Banner */}
       <View style={styles.banner}>
         <Text style={styles.bannerLabel}>TOTAL EARNINGS</Text>

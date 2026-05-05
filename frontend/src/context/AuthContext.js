@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       const hint =
         err?.message?.includes('Failed to fetch')
-          ? ' Start the backend, use the same host as this page (localhost vs 127.0.0.1), or set EXPO_PUBLIC_API_URL (e.g. http://localhost:5001/api).'
+          ? ' Start the backend, use the same host as this page (localhost vs 127.0.0.1), or set EXPO_PUBLIC_API_URL (e.g. http://192.168.151.112:5002/api for a real phone on your Wi-Fi).'
           : '';
       throw new Error(
         `${err?.message || 'Network error'} — cannot reach ${API_URL}/login.${hint}`
@@ -143,7 +143,7 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         const hint =
           err?.message?.includes('Failed to fetch')
-            ? ' Start the backend and set EXPO_PUBLIC_API_URL if needed (e.g. http://localhost:5001/api).'
+            ? ' Start the backend and set EXPO_PUBLIC_API_URL if needed (e.g. http://192.168.151.112:5002/api for a real phone on your Wi-Fi).'
             : '';
         throw new Error(
           `${err?.message || 'Network error'} — cannot reach ${API_URL}/register.${hint}`

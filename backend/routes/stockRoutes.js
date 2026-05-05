@@ -65,9 +65,9 @@ router.route('/expired/all')
   .delete(protect, farmerRole, removeExpiredStock);
 
 router.route('/:id')
-  .get(protect, farmerRole, getStockById)
-  .put(protect, farmerRole, maybeHandleUpload, validateStockData, updateStock)
-  .delete(protect, farmerRole, deleteStock);
+  .get(protect, getStockById)
+  .put(protect, maybeHandleUpload, validateStockData, updateStock)
+  .delete(protect, deleteStock);
 
 router.route('/:id/visibility')
   .patch(protect, farmerRole, toggleVisibility);

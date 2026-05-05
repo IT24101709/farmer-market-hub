@@ -105,3 +105,14 @@ export const getAllOrders = async (token, params = {}) => {
 
 // Alias used by AdminOrdersScreen
 export const getAdminOrders = getAllOrders;
+
+export const deleteOrder = async (orderId, token) => {
+  try {
+    const response = await axios.delete(`${API_URL}/${orderId}`, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to delete order');
+  }
+};

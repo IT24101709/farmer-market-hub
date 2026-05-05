@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Dimensions,
-  ImageBackground
+  ImageBackground,
+  Modal
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 
@@ -22,54 +23,67 @@ const RegisterScreen = ({ navigation }) => {
   const [businessName, setBusinessName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [district, setDistrict] = useState('');
   const [loadingLocal, setLoadingLocal] = useState(false);
-  const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const [showPopup, setShowPopup] = useState(false);
   const [registrationData, setRegistrationData] = useState(null);
 
   const { register } = useContext(AuthContext);
 
   const validateForm = () => {
+    setLocalError('');
     if (!name.trim() || !email.trim() || !password) {
-      Alert.alert('Error', '❌ Please fill in all required fields (*).');
+      setLocalError('❌ Please fill in all required fields (*).');
       return false;
     }
 
     if (!/^[a-zA-Z\s]{3,50}$/.test(name.trim())) {
-      Alert.alert('Error', '❌ Full Name must be 3-50 characters with no special symbols.');
+      setLocalError('❌ Full Name must be 3-50 characters with no special symbols.');
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Error', '❌ Please enter a valid email address.');
+      setLocalError('❌ Please enter a valid email address.');
       return false;
     }
 
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!passwordRegex.test(password)) {
-      Alert.alert('Error', '❌ Password must contain 8+ chars, uppercase, number & symbol.');
+      setLocalError('❌ Password must contain 8+ chars, uppercase, number & symbol.');
       return false;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', '❌ Passwords do not match.');
+      setLocalError('❌ Passwords do not match.');
       return false;
     }
 
     if (role === 'Farmer') {
       if (!businessName.trim() || businessName.length > 100) {
-        Alert.alert('Error', '❌ Farm Name is required and must be under 100 characters.');
+        setLocalError('❌ Farm Name is required and must be under 100 characters.');
         return false;
       }
-      if (!phone.trim() || !/^\d{10,15}$/.test(phone)) {
-        Alert.alert('Error', '❌ Enter a valid 10-digit mobile number.');
+      if (!phone.trim() || !/^\d{10,15}$/.test(phone.trim())) {
+        setLocalError('❌ Enter a valid 10-digit mobile number.');
+        return false;
+      }
+      
+      const safeDistrict = district || '';
+      const formattedDistrict = safeDistrict.trim() 
+        ? safeDistrict.trim().charAt(0).toUpperCase() + safeDistrict.trim().slice(1).toLowerCase() 
+        : '';
+        
+      if (formattedDistrict && !['North', 'South', 'East', 'West', 'Central'].includes(formattedDistrict)) {
+        setLocalError('❌ District must be North, South, East, West, or Central.');
         return false;
       }
     }
 
     if (role === 'Customer') {
       if (address.trim() && address.length > 200) {
-        Alert.alert('Error', '❌ Address must be under 200 characters.');
+        setLocalError('❌ Address must be under 200 characters.');
         return false;
       }
     }
@@ -82,9 +96,20 @@ const RegisterScreen = ({ navigation }) => {
 
     try {
       setLoadingLocal(true);
+      setLocalError('');
       console.log('🔄 Starting registration with role:', role);
       
-      const result = await register(name, email, password, role, { businessName, phone, address });
+      const safeDistrict = district || '';
+      const formattedDistrict = safeDistrict.trim() 
+        ? safeDistrict.trim().charAt(0).toUpperCase() + safeDistrict.trim().slice(1).toLowerCase() 
+        : undefined;
+
+      const result = await register(name, email, password, role, { 
+        businessName, 
+        phone: (phone || '').trim(), 
+        address: (address || '').trim(),
+        region: formattedDistrict
+      });
       console.log('✅ Registration result:', result);
 
       // Customers receive a token immediately: session is stored and the app switches to the customer home.
@@ -94,13 +119,10 @@ const RegisterScreen = ({ navigation }) => {
       }
 
       setRegistrationData(result);
-      setRegistrationComplete(true);
 
       if (role === 'Farmer' && !result.isApproved) {
         console.log('🚜 Farmer account pending approval');
-        Alert.alert('✅ Registration Successful!', 'Your farmer account is created and pending admin approval.\nYou can try logging in once approved.', [
-          { text: 'OK', onPress: () => navigation.navigate('Login') }
-        ]);
+        setShowPopup(true);
       } else {
         console.log('✅ User account created and ready');
         Alert.alert('✅ Registration Successful!', `Welcome ${name}! Your account is ready.`, [
@@ -110,110 +132,13 @@ const RegisterScreen = ({ navigation }) => {
     } catch (error) {
       console.error('❌ Registration error:', error);
       console.error('❌ Error message:', error.message);
-      Alert.alert('❌ Registration Failed', error.message || 'An error occurred during registration. Please try again.');
+      setLocalError(error.message || 'An error occurred during registration. Please try again.');
     } finally {
       setLoadingLocal(false);
     }
   };
 
-  if (registrationComplete) {
-    return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {registrationData?.role === 'Farmer' && !registrationData?.isApproved ? (
-            <View style={styles.successCard}>
-              <View style={styles.pendingBadge}>
-                <Text style={styles.pendingText}>PENDING APPROVAL</Text>
-              </View>
-              <Text style={styles.successTitle}>Registration Successful!</Text>
-              <Text style={styles.successMessage}>
-                Hello {registrationData?.name}, your account has been created as a Farmer.
-              </Text>
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>⏳ Awaiting Admin Approval</Text>
-                <Text style={styles.infoText}>
-                  Your account is now pending approval from our admin team. You will receive an email notification once your account is approved.
-                </Text>
-                <Text style={styles.infoText}>
-                  You can try logging in once you receive the approval email.
-                </Text>
-              </View>
-              <View style={styles.detailsBox}>
-                <Text style={styles.detailsTitle}>Your Registration Details:</Text>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Email:</Text>
-                  <Text style={styles.detailValue}>{registrationData?.email}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Role:</Text>
-                  <Text style={styles.detailValue}>{registrationData?.role}</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => navigation.navigate('Login')}
-              >
-                <Text style={styles.btnText}>Go to Login</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={() => {
-                  setRegistrationComplete(false);
-                  setName('');
-                  setEmail('');
-                  setPassword('');
-                  setConfirmPassword('');
-                  setRole('Customer');
-                  setBusinessName('');
-                  setPhone('');
-                  setAddress('');
-                }}
-              >
-                <Text style={styles.secondaryBtnText}>Register Another Account</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.successCard}>
-              <View style={styles.approvedBadge}>
-                <Text style={styles.approvedText}>✓ APPROVED</Text>
-              </View>
-              <Text style={styles.successTitle}>Welcome to Farmers Market Hub!</Text>
-              <Text style={styles.successMessage}>
-                Hello {registrationData?.name}, your account is ready to use.
-              </Text>
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>🎉 You're All Set</Text>
-                <Text style={styles.infoText}>
-                  You can now login and start browsing the market or selling your products.
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => navigation.navigate('Login')}
-              >
-                <Text style={styles.btnText}>Go to Login</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={() => {
-                  setRegistrationComplete(false);
-                  setName('');
-                  setEmail('');
-                  setPassword('');
-                  setConfirmPassword('');
-                  setRole('Customer');
-                  setBusinessName('');
-                  setPhone('');
-                }}
-              >
-                <Text style={styles.secondaryBtnText}>Register Another Account</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
+
 
   return (
     <View style={styles.container}>
@@ -232,7 +157,12 @@ const RegisterScreen = ({ navigation }) => {
               styles.roleCard,
               role === 'Customer' && styles.roleCardActive
             ]}
-            onPress={() => setRole('Customer')}
+            onPress={() => {
+              setRole('Customer');
+              setPhone('');
+              setBusinessName('');
+              setDistrict('');
+            }}
           >
             <Text style={styles.roleEmoji}>🛒</Text>
             <Text
@@ -321,6 +251,28 @@ const RegisterScreen = ({ navigation }) => {
                 />
               </View>
 
+              <View style={styles.formSection}>
+                <Text style={styles.label}>District (Region)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., North, South, Central"
+                  value={district}
+                  onChangeText={setDistrict}
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Address</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your address"
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholderTextColor="#999"
+                />
+              </View>
+
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
                   ℹ️ As a farmer, your account will need admin approval before you can login for the first time.
@@ -366,6 +318,12 @@ const RegisterScreen = ({ navigation }) => {
             />
           </View>
 
+          {localError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{localError}</Text>
+            </View>
+          ) : null}
+
           <TouchableOpacity
             style={[styles.registerBtn, loadingLocal && styles.registerBtnDisabled]}
             onPress={handleRegister}
@@ -385,6 +343,36 @@ const RegisterScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Pop-up message for Farmer Registration */}
+      <Modal visible={showPopup} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <Text style={styles.modalIcon}>✅</Text>
+            </View>
+            <Text style={styles.modalTitle}>Registration Successful!</Text>
+            <Text style={styles.modalMessage}>
+              Hello {name}, your farmer account has been created.
+            </Text>
+            <View style={styles.modalInfoBox}>
+              <Text style={styles.modalInfoText}>
+                Please wait until the admin approves your account before you can log in to the system.
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.modalButton} 
+              onPress={() => {
+                setShowPopup(false);
+                navigation.navigate('Login');
+              }}
+            >
+              <Text style={styles.modalButtonText}>Go to Login</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -495,6 +483,20 @@ const styles = StyleSheet.create({
     color: '#2d5016',
     lineHeight: 18,
   },
+  errorBox: {
+    backgroundColor: '#fee2e2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#991b1b',
+    lineHeight: 18,
+    fontWeight: '600'
+  },
   registerBtn: {
     backgroundColor: '#15803d',
     paddingVertical: 14,
@@ -521,110 +523,80 @@ const styles = StyleSheet.create({
     color: '#15803d',
     fontWeight: '600',
   },
-  // Success/Completion screen styles
-  successCard: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
-    elevation: 5,
-    marginVertical: 20,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8
   },
-  pendingBadge: {
-    alignSelf: 'center',
-    backgroundColor: '#fff3cd',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    marginBottom: 16,
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16
   },
-  pendingText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#856404',
+  modalIcon: {
+    fontSize: 32
   },
-  approvedBadge: {
-    alignSelf: 'center',
-    backgroundColor: '#d4edda',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    marginBottom: 16,
-  },
-  approvedText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#155724',
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2d5016',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  successMessage: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2d5016',
-    marginBottom: 8,
-  },
-  detailsBox: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 16,
-  },
-  detailsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#166534',
     marginBottom: 12,
+    textAlign: 'center'
   },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingVertical: 4,
+  modalMessage: {
+    fontSize: 15,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginBottom: 16
   },
-  detailLabel: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
+  modalInfoBox: {
+    backgroundColor: '#fef3c7',
+    padding: 16,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+    marginBottom: 24,
+    width: '100%'
   },
-  detailValue: {
-    fontSize: 13,
-    color: '#333',
+  modalInfoText: {
+    color: '#92400e',
+    fontSize: 14,
     fontWeight: '600',
+    lineHeight: 20,
+    textAlign: 'center'
   },
-  primaryBtn: {
+  modalButton: {
     backgroundColor: '#15803d',
     paddingVertical: 14,
+    paddingHorizontal: 32,
     borderRadius: 8,
-    alignItems: 'center',
-    marginVertical: 12,
-    elevation: 3,
+    width: '100%',
+    alignItems: 'center'
   },
-  secondaryBtn: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#15803d',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  secondaryBtnText: {
-    color: '#15803d',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700'
+  }
 });
 
 export default RegisterScreen;

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { getPaymentById, updatePaymentStatus } from '../../services/paymentService';
+import { deletePayment, getPaymentById, updatePaymentStatus } from '../../services/paymentService';
 
 const STATUSES = ['PENDING', 'SUCCESS', 'FAILED'];
 
@@ -95,6 +95,41 @@ const PaymentDetailScreen = ({ route, navigation }) => {
     ]);
   };
 
+  const handleDelete = () => {
+    const message = 'Delete this payment record permanently? This cannot be undone.';
+
+    const run = async () => {
+      setBusy(true);
+      try {
+        await deletePayment(paymentId, token);
+        if (Platform.OS === 'web') {
+          window.alert('Payment deleted.');
+          navigation.goBack();
+        } else {
+          Alert.alert('Success', 'Payment deleted.', [
+            { text: 'OK', onPress: () => navigation.goBack() }
+          ]);
+        }
+      } catch (e) {
+        const errorMessage = e.message || 'Delete failed';
+        if (Platform.OS === 'web') window.alert(errorMessage);
+        else Alert.alert('Error', errorMessage);
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) run();
+      return;
+    }
+
+    Alert.alert('Delete payment', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: run }
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -121,11 +156,17 @@ const PaymentDetailScreen = ({ route, navigation }) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Payment #{String(payment._id).slice(-8).toUpperCase()}</Text>
-      <Text style={styles.line}>Order: #{orderId ? String(orderId).slice(-8).toUpperCase() : '-'}</Text>
-      <Text style={styles.line}>Customer: {payment.customerId?.name || 'Unknown'}</Text>
-      <Text style={styles.line}>Method: {payment.paymentMethod}</Text>
-      <Text style={styles.line}>Amount: LKR {Number(payment.amount || 0).toFixed(2)}</Text>
-      <Text style={styles.line}>Date: {formatDate(payment.createdAt)}</Text>
+      <View style={styles.section}>
+        <Text style={styles.line}>Transaction: {payment.transactionReference || '-'}</Text>
+        <Text style={styles.line}>Order: #{orderId ? String(orderId).slice(-8).toUpperCase() : '-'}</Text>
+        <Text style={styles.line}>Order status: {payment.orderId?.status || '-'}</Text>
+        <Text style={styles.line}>Customer: {payment.customerId?.name || 'Unknown'}</Text>
+        <Text style={styles.line}>Email: {payment.customerId?.email || '-'}</Text>
+        <Text style={styles.line}>Method: {payment.paymentMethod}</Text>
+        <Text style={styles.line}>Amount: LKR {Number(payment.amount || 0).toFixed(2)}</Text>
+        <Text style={styles.line}>Created: {formatDate(payment.createdAt)}</Text>
+        <Text style={styles.line}>Updated: {formatDate(payment.updatedAt)}</Text>
+      </View>
 
       <View style={[styles.statusBadge, { backgroundColor: `${color}22` }]}>
         <Text style={[styles.statusText, { color }]}>{payment.paymentStatus}</Text>
@@ -164,6 +205,13 @@ const PaymentDetailScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             ))}
           </View>
+          <TouchableOpacity
+            style={[styles.deleteButton, busy && styles.disabled]}
+            onPress={handleDelete}
+            disabled={busy}
+          >
+            <Text style={styles.deleteButtonText}>Delete Payment</Text>
+          </TouchableOpacity>
         </>
       )}
     </ScrollView>
@@ -201,6 +249,19 @@ const styles = StyleSheet.create({
   statusButtonText: { color: '#e65100', fontWeight: '800', fontSize: 13 },
   statusButtonTextActive: { color: '#bf360c' },
   disabled: { opacity: 0.55 },
+  deleteButton: {
+    marginTop: 18,
+    backgroundColor: '#fee2e2',
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    alignItems: 'center'
+  },
+  deleteButtonText: {
+    color: '#dc2626',
+    fontWeight: '900'
+  },
   muted: { color: '#64748b', fontWeight: '700' },
   backButton: { marginTop: 16, backgroundColor: '#ff9800', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   backButtonText: { color: '#fff', fontWeight: '900' }

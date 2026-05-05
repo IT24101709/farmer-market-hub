@@ -1,7 +1,65 @@
 const Review = require('../models/Review');
 const Stock = require('../models/Stock');
+const Order = require('../models/Order');
+const User = require('../models/User');
+const mongoose = require('mongoose');
 
 const uid = (user) => String(user?.id || user?._id || '');
+
+const COMMENT_MIN_LENGTH = 3;
+const COMMENT_MAX_LENGTH = 600;
+const DUPLICATE_WINDOW_MS = 60 * 1000;
+const PROFANITY_PATTERNS = [
+  /\bfuck(?:ing|er|ed)?\b/i,
+  /\bshit(?:ty)?\b/i,
+  /\basshole\b/i,
+  /\bbitch\b/i,
+  /\bbastard\b/i,
+  /\bdamn\b/i,
+  /\bscam(?:mer)?\b/i
+];
+
+function isObjectId(value) {
+  return mongoose.Types.ObjectId.isValid(String(value || ''));
+}
+
+function normalizeComment(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function validateComment(comment) {
+  if (comment.length < COMMENT_MIN_LENGTH) {
+    return `Review text must be at least ${COMMENT_MIN_LENGTH} characters.`;
+  }
+  if (comment.length > COMMENT_MAX_LENGTH) {
+    return `Review text cannot exceed ${COMMENT_MAX_LENGTH} characters.`;
+  }
+  if (PROFANITY_PATTERNS.some((pattern) => pattern.test(comment))) {
+    return 'Review contains inappropriate language.';
+  }
+  if (/(.)\1{7,}/i.test(comment)) {
+    return 'Review looks like spam. Avoid repeated characters.';
+  }
+  const words = comment.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 6) {
+    const mostCommon = Math.max(...words.map((word) => words.filter((w) => w === word).length));
+    if (mostCommon / words.length > 0.55) {
+      return 'Review looks like spam. Avoid repeating the same words.';
+    }
+  }
+  if (/(https?:\/\/|www\.|@\w+)/i.test(comment)) {
+    return 'Review text cannot include links or promotional contact handles.';
+  }
+  return null;
+}
+
+function validateRating(value) {
+  const numericRating = Number(value);
+  if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+    return { error: 'Rating must be a whole number between 1 and 5.' };
+  }
+  return { rating: numericRating };
+}
 
 function summaryFrom(reviews) {
   const count = reviews.length;
@@ -17,18 +75,73 @@ exports.createReview = async (req, res) => {
     const { stockId, rating, comment, orderId } = req.body;
     const customerId = uid(req.user);
 
+    if (!customerId || !isObjectId(customerId)) {
+      return res.status(401).json({ message: 'You must be logged in to submit a review.' });
+    }
+    if (req.user?.status && req.user.status !== 'Active') {
+      return res.status(403).json({ message: 'Suspended or inactive users cannot submit reviews.' });
+    }
     if (!stockId) {
       return res.status(400).json({ message: 'stockId is required' });
     }
-
-    const numericRating = Number(rating);
-    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
-      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    if (!isObjectId(stockId)) {
+      return res.status(400).json({ message: 'stockId must be a valid product ID.' });
+    }
+    if (orderId && !isObjectId(orderId)) {
+      return res.status(400).json({ message: 'orderId must be a valid order ID.' });
     }
 
-    const stock = await Stock.findById(stockId);
+    const ratingResult = validateRating(rating);
+    if (ratingResult.error) {
+      return res.status(400).json({ message: ratingResult.error });
+    }
+
+    const cleanComment = normalizeComment(comment);
+    const commentError = validateComment(cleanComment);
+    if (commentError) {
+      return res.status(400).json({ message: commentError });
+    }
+
+    const [customer, stock] = await Promise.all([
+      User.findById(customerId).select('_id role status'),
+      Stock.findById(stockId)
+    ]);
+    if (!customer || customer.role !== 'Customer') {
+      return res.status(403).json({ message: 'Only valid customer accounts can submit reviews.' });
+    }
     if (!stock || stock.isDeleted) {
       return res.status(404).json({ message: 'Vegetable listing not found' });
+    }
+
+    if (String(stock.farmerId) === customerId) {
+      return res.status(400).json({ message: 'You cannot review your own product listing.' });
+    }
+
+    if (orderId) {
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found for this review.' });
+      }
+      if (String(order.customerId) !== customerId) {
+        return res.status(403).json({ message: 'You can only review products from your own orders.' });
+      }
+      const orderedThisProduct = (order.items || []).some((item) => String(item.stockId) === String(stockId));
+      if (!orderedThisProduct) {
+        return res.status(400).json({ message: 'This product was not part of the selected order.' });
+      }
+      if (!['DELIVERED', 'CONFIRMED', 'READY_FOR_DELIVERY', 'ASSIGNED', 'IN_TRANSIT'].includes(order.status)) {
+        return res.status(400).json({ message: 'You can review only after the order is confirmed or fulfilled.' });
+      }
+    }
+
+    const existingReview = await Review.findOne({ customerId, stockId });
+    if (existingReview) {
+      const recentlyUpdated =
+        existingReview.updatedAt &&
+        Date.now() - new Date(existingReview.updatedAt).getTime() < DUPLICATE_WINDOW_MS;
+      if (recentlyUpdated) {
+        return res.status(429).json({ message: 'Please wait before editing this review again.' });
+      }
     }
 
     const review = await Review.findOneAndUpdate(
@@ -38,8 +151,8 @@ exports.createReview = async (req, res) => {
         stockId,
         farmerId: stock.farmerId,
         orderId: orderId || null,
-        rating: numericRating,
-        comment: comment || '',
+        rating: ratingResult.rating,
+        comment: cleanComment,
         isRemoved: false,
         removedBy: null,
         removalReason: '',
@@ -112,16 +225,25 @@ exports.updateOwnReview = async (req, res) => {
       return res.status(403).json({ message: 'You can only edit your own review' });
     }
 
-    const numericRating = Number(req.body.rating);
-    if (Number.isFinite(numericRating)) {
-      if (numericRating < 1 || numericRating > 5) {
-        return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    if (review.updatedAt && Date.now() - new Date(review.updatedAt).getTime() < DUPLICATE_WINDOW_MS) {
+      return res.status(429).json({ message: 'Please wait before editing this review again.' });
+    }
+
+    if (req.body.rating !== undefined) {
+      const ratingResult = validateRating(req.body.rating);
+      if (ratingResult.error) {
+        return res.status(400).json({ message: ratingResult.error });
       }
-      review.rating = numericRating;
+      review.rating = ratingResult.rating;
     }
 
     if (typeof req.body.comment === 'string') {
-      review.comment = req.body.comment;
+      const cleanComment = normalizeComment(req.body.comment);
+      const commentError = validateComment(cleanComment);
+      if (commentError) {
+        return res.status(400).json({ message: commentError });
+      }
+      review.comment = cleanComment;
     }
     review.isRemoved = false;
     review.removalReason = '';

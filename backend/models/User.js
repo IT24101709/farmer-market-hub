@@ -92,8 +92,7 @@ const userSchema = new mongoose.Schema({
     },
     vehicleType: {
       type: String,
-      enum: ['bike', 'van', 'truck', 'tempo'],
-      default: null
+      enum: ['bike', 'van', 'truck', 'tempo']
     },
     serviceCities: [{
       type: String,

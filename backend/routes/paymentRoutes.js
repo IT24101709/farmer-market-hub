@@ -6,7 +6,8 @@ const {
   getMyPayments,
   getPaymentByOrderId,
   getPaymentById,
-  updatePaymentStatus
+  updatePaymentStatus,
+  deletePayment
 } = require('../controllers/paymentController');
 const { protect, adminRole, customerRole } = require('../middleware/authMiddleware');
 
@@ -27,6 +28,9 @@ router.get('/order/:orderId', getPaymentByOrderId);
 
 // Admin: update status manually
 router.patch('/:id/status', adminRole, updatePaymentStatus);
+
+// Admin: delete payment record
+router.delete('/:id', adminRole, deletePayment);
 
 // Any authenticated user: payment by payment ID
 router.get('/:id', getPaymentById);

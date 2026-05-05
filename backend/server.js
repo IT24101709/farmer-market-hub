@@ -262,7 +262,7 @@ connectDB()
         if (err.code === 'EADDRINUSE') {
           console.error(`\n❌ Port ${PORT} is already in use.`);
           console.error(`   Free it: netstat -ano | findstr ":${PORT}"  then  taskkill /PID <pid> /F`);
-          console.error('   Dev API URL must match frontend: frontend/src/config.js (default http://localhost:5000/api).\n');
+      console.error('   Dev API URL must match frontend/.env, for example EXPO_PUBLIC_API_URL=http://<your-ip>:5002/api.\n');
         } else {
           console.error(err);
         }

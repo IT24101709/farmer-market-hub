@@ -48,10 +48,11 @@ export const getMyPayments = async (token) => {
 };
 
 // GET /api/payments/overview — Admin stats
-export const getPaymentOverview = async (token) => {
+export const getPaymentOverview = async (token, params = {}) => {
   try {
     const response = await axios.get(`${API_URL}/overview`, {
-      headers: authHeaders(token)
+      headers: authHeaders(token),
+      params
     });
     return response.data;
   } catch (error) {
@@ -94,5 +95,17 @@ export const updatePaymentStatus = async (paymentId, paymentStatus, note, token)
     return response.data;
   } catch (error) {
     throw normalizeError(error, 'Failed to update payment status');
+  }
+};
+
+// DELETE /api/payments/:id — Admin deletes a payment record
+export const deletePayment = async (paymentId, token) => {
+  try {
+    const response = await axios.delete(`${API_URL}/${paymentId}`, {
+      headers: authHeaders(token)
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeError(error, 'Failed to delete payment');
   }
 };

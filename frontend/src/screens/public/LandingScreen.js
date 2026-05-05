@@ -1,21 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
+import React, { useEffect, useMemo, useState } from 'react';
+import {
   ActivityIndicator,
+  Image,
+  ImageBackground,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  Dimensions
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { getPublicProducts } from '../../services/publicService';
 import { resolveStockImageUrl } from '../../config';
 
-const { width } = Dimensions.get('window');
+const HERO_FALLBACK =
+  'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1400&q=80';
 
 const previewImageUrl = (product) => resolveStockImageUrl(product);
+
+const StatItem = ({ value, label }) => (
+  <View style={styles.statItem}>
+    <Text style={styles.statValue}>{value}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </View>
+);
+
+const FeatureItem = ({ title, text }) => (
+  <View style={styles.featureItem}>
+    <Text style={styles.featureTitle}>{title}</Text>
+    <Text style={styles.featureText}>{text}</Text>
+  </View>
+);
+
+const StepItem = ({ number, title, text }) => (
+  <View style={styles.stepItem}>
+    <Text style={styles.stepNumber}>{number}</Text>
+    <View style={styles.stepCopy}>
+      <Text style={styles.stepTitle}>{title}</Text>
+      <Text style={styles.stepText}>{text}</Text>
+    </View>
+  </View>
+);
 
 const LandingScreen = ({ navigation }) => {
   const [products, setProducts] = useState([]);
@@ -26,44 +52,67 @@ const LandingScreen = ({ navigation }) => {
     const fetchProducts = async () => {
       try {
         const data = await getPublicProducts();
-        setProducts(data);
+        setProducts(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching public products:', error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchProducts();
   }, []);
 
+  const heroImage = HERO_FALLBACK;
+
+  const handleExplore = () => {
+    navigation.navigate('Login');
+  };
+
+  const handleSearch = () => {
+    navigation.navigate('Login', { search: searchQuery.trim() });
+  };
+
   const renderProductPreview = () => {
     if (loading) {
-      return <ActivityIndicator size="large" color="#15803d" style={{ marginVertical: 30 }} />;
+      return <ActivityIndicator size="large" color="#15803d" style={styles.loader} />;
     }
 
     if (products.length === 0) {
-      return <Text style={styles.emptyText}>More fresh produce arriving soon!</Text>;
+      return (
+        <View style={styles.emptyPanel}>
+          <Text style={styles.emptyTitle}>Fresh listings are coming soon.</Text>
+          <Text style={styles.emptyText}>Create an account to be ready when local farmers publish new stock.</Text>
+        </View>
+      );
     }
 
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productScroll}>
-        {products.map((product) => {
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productRow}>
+        {products.slice(0, 8).map((product) => {
           const imageUrl = previewImageUrl(product);
           const title = product.name || product.vegetableName || 'Fresh produce';
 
           return (
-            <View key={product._id} style={styles.productCard}>
+            <TouchableOpacity
+              key={product._id}
+              style={styles.productCard}
+              activeOpacity={0.86}
+              onPress={handleExplore}
+            >
               {imageUrl ? (
                 <Image source={{ uri: imageUrl }} style={styles.productImage} />
               ) : (
-                <View style={[styles.productImage, { backgroundColor: '#E0E0E0' }]} />
+                <View style={[styles.productImage, styles.imagePlaceholder]} />
               )}
               <View style={styles.productInfo}>
-                <Text style={styles.productName}>{title}</Text>
-                <Text style={styles.productPrice}>LKR {product.pricePerKg}/kg</Text>
-                <Text style={styles.farmerName}>By {product.farmerId?.name || 'Local Farmer'}</Text>
+                <Text style={styles.productName} numberOfLines={1}>{title}</Text>
+                <Text style={styles.productPrice}>LKR {Number(product.pricePerKg || 0).toFixed(2)}/kg</Text>
+                <Text style={styles.farmerName} numberOfLines={1}>
+                  {product.farmerId?.name || 'Local farmer'}
+                </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         })}
       </ScrollView>
@@ -71,424 +120,494 @@ const LandingScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* HEADER NAVBAR */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.navbar}>
-        <Text style={styles.logoText}>🌱 FM Hub</Text>
+        <TouchableOpacity activeOpacity={0.8}>
+          <Text style={styles.logoText}>Farmers Market Hub</Text>
+        </TouchableOpacity>
         <View style={styles.navLinks}>
           <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.navBtn}>
-            <Text style={styles.navBtnText}>Login</Text>
+            <Text style={styles.navBtnText}>Log in</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')} style={[styles.navBtn, styles.navBtnPrimary]}>
-            <Text style={styles.navBtnTextWhite}>Sign Up</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.navBtnPrimary}>
+            <Text style={styles.navBtnPrimaryText}>Create account</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
-        
-        {/* HERO SECTION */}
-        <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Fresh from Farm to Your Table</Text>
-          <Text style={styles.heroSubtitle}>Connecting local farmers directly with buyers for the freshest, most affordable produce.</Text>
-          <Text style={styles.heroAccountHint}>
-            New here? Create a free customer account (Sign Up), then sign in. Each person uses their own email—many customers are welcome.
-          </Text>
-
-          <View style={styles.searchContainer}>
-            <TextInput 
-              style={styles.searchInput} 
-              placeholder="Search for fresh vegetables..." 
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity 
-              style={styles.searchBtn} 
-              onPress={() => navigation.navigate('Login')} // Prompt login for full search
-            >
-              <Text style={styles.searchBtnText}>Search</Text>
-            </TouchableOpacity>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ImageBackground source={{ uri: heroImage }} style={styles.hero} imageStyle={styles.heroImage}>
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroContent}>
+              <Text style={styles.heroEyebrow}>Direct local produce marketplace</Text>
+              <Text style={styles.heroTitle}>Farmers Market Hub</Text>
+              <Text style={styles.heroSubtitle}>
+                Buy fresh vegetables from nearby farmers, track stock availability, and manage orders in one simple marketplace.
+              </Text>
+              <View style={styles.heroActions}>
+                <TouchableOpacity style={styles.primaryCta} onPress={() => navigation.navigate('Register')}>
+                  <Text style={styles.primaryCtaText}>Get started</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryCta} onPress={handleExplore}>
+                  <Text style={styles.secondaryCtaText}>Browse marketplace</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
+        </ImageBackground>
+
+        <View style={styles.searchBand}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search vegetables, greens, roots, herbs..."
+            placeholderTextColor="#64748b"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            onSubmitEditing={handleSearch}
+          />
+          <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+            <Text style={styles.searchButtonText}>Search</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* FEATURE HIGHLIGHTS */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statIcon}>👨‍🌾</Text>
-            <Text style={styles.statNumber}>500+</Text>
-            <Text style={styles.statLabel}>Local Farmers</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statIcon}>🥬</Text>
-            <Text style={styles.statNumber}>10k+</Text>
-            <Text style={styles.statLabel}>Kg Traded</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statIcon}>✅</Text>
-            <Text style={styles.statNumber}>100%</Text>
-            <Text style={styles.statLabel}>Fresh Quality</Text>
-          </View>
+        <View style={styles.statsBand}>
+          <StatItem value="Fresh" label="daily farmer listings" />
+          <StatItem value="Local" label="verified sellers" />
+          <StatItem value="Simple" label="orders and payments" />
         </View>
 
-        {/* PRODUCT PREVIEW */}
-        <View style={styles.sectionContainer}>
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Top Picks</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Available Today</Text>
+              <Text style={styles.sectionSubtitle}>A quick look at fresh stock currently visible to customers.</Text>
+            </View>
             <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.viewAllText}>View All →</Text>
+              <Text style={styles.linkText}>View all</Text>
             </TouchableOpacity>
           </View>
           {renderProductPreview()}
         </View>
 
-        {/* HOW IT WORKS */}
-        <View style={[styles.sectionContainer, { backgroundColor: '#FFFFFF', paddingVertical: 30 }]}>
-          <Text style={[styles.sectionTitle, { textAlign: 'center', marginBottom: 30 }]}>How It Works</Text>
-          
-          <View style={styles.stepsGrid}>
-            <View style={styles.stepCard}>
-              <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
-              <Text style={styles.stepTitle}>Sign Up</Text>
-              <Text style={styles.stepDesc}>Register as a farmer to list, or buyer to shop.</Text>
-            </View>
-            <View style={styles.stepCard}>
-              <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
-              <Text style={styles.stepTitle}>Browse & List</Text>
-              <Text style={styles.stepDesc}>Farmers add fresh stock, buyers find deals.</Text>
-            </View>
-            <View style={styles.stepCard}>
-              <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>
-              <Text style={styles.stepTitle}>Connect</Text>
-              <Text style={styles.stepDesc}>Chat and agree on quality and pickup times.</Text>
-            </View>
-            <View style={styles.stepCard}>
-              <View style={styles.stepNumber}><Text style={styles.stepNumberText}>4</Text></View>
-              <Text style={styles.stepTitle}>Trade</Text>
-              <Text style={styles.stepDesc}>Complete the transaction securely.</Text>
-            </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Built for every role</Text>
+          <View style={styles.featureGrid}>
+            <FeatureItem
+              title="Customers"
+              text="Browse produce, place orders, pay securely, and follow delivery updates."
+            />
+            <FeatureItem
+              title="Farmers"
+              text="Publish stock, update quantity and prices, confirm orders, and monitor payments."
+            />
+            <FeatureItem
+              title="Admins"
+              text="Manage users, marketplace stock, orders, payments, reviews, deliveries, and reports."
+            />
           </View>
         </View>
 
-        {/* CTA BANNER */}
-        <View style={styles.ctaBanner}>
-          <Text style={styles.ctaTitle}>Ready to start trading?</Text>
-          <Text style={styles.ctaSubtitle}>Join our growing community today.</Text>
-          <TouchableOpacity style={styles.ctaBtn} onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.ctaBtnText}>Create Free Account</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>How it works</Text>
+          <View style={styles.steps}>
+            <StepItem number="01" title="Create an account" text="Register as a customer or farmer and sign in securely." />
+            <StepItem number="02" title="List or browse stock" text="Farmers add fresh items while customers browse available produce." />
+            <StepItem number="03" title="Confirm and deliver" text="Orders move through confirmation, payment, delivery, and review." />
+          </View>
+        </View>
+
+        <View style={styles.ctaBand}>
+          <Text style={styles.ctaTitle}>Start with the freshest listings in your area.</Text>
+          <Text style={styles.ctaText}>Create an account to access marketplace prices, ordering, reviews, and delivery tracking.</Text>
+          <TouchableOpacity style={styles.ctaButton} onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.ctaButtonText}>Create free account</Text>
           </TouchableOpacity>
         </View>
 
-        {/* FOOTER */}
         <View style={styles.footer}>
-          <Text style={styles.logoTextDark}>🌱 FM Hub</Text>
-          <Text style={styles.footerText}>© 2026 Farmers Market Hub.</Text>
-          <Text style={styles.footerText}>All rights reserved.</Text>
+          <Text style={styles.footerBrand}>Farmers Market Hub</Text>
+          <Text style={styles.footerText}>Fresh produce, transparent stock, and simpler local trade.</Text>
+          <Text style={styles.footerMeta}>2026 Farmers Market Hub. All rights reserved.</Text>
         </View>
-
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#f8fafc'
   },
   navbar: {
+    minHeight: 66,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    zIndex: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    zIndex: 10
   },
   logoText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-  },
-  logoTextDark: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    color: '#14532d',
+    fontSize: 18,
+    fontWeight: '900'
   },
   navLinks: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8
   },
   navBtn: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  navBtnPrimary: {
-    backgroundColor: '#15803d',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 8
   },
   navBtnText: {
-    color: '#333',
-    fontWeight: '600',
+    color: '#334155',
+    fontWeight: '800'
   },
-  navBtnTextWhite: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+  navBtnPrimary: {
+    backgroundColor: '#166534',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8
   },
-  heroSection: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 20,
-    paddingVertical: 50,
-    alignItems: 'center',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+  navBtnPrimaryText: {
+    color: '#ffffff',
+    fontWeight: '900'
+  },
+  scrollContent: {
+    paddingBottom: 40
+  },
+  hero: {
+    minHeight: 430,
+    justifyContent: 'flex-end'
+  },
+  heroImage: {
+    resizeMode: 'cover'
+  },
+  heroOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(20, 83, 45, 0.58)',
+    paddingHorizontal: 22,
+    paddingTop: 54,
+    paddingBottom: 42
+  },
+  heroContent: {
+    maxWidth: 760
+  },
+  heroEyebrow: {
+    color: '#bbf7d0',
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+    marginBottom: 10
   },
   heroTitle: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1B5E20',
-    textAlign: 'center',
-    marginBottom: 15,
-    lineHeight: 42,
+    color: '#ffffff',
+    fontSize: 44,
+    lineHeight: 50,
+    fontWeight: '900',
+    marginBottom: 12
   },
   heroSubtitle: {
-    fontSize: 16,
-    color: '#388E3C',
-    textAlign: 'center',
-    marginBottom: 14,
-    paddingHorizontal: 10,
-    lineHeight: 24,
+    color: '#ecfdf5',
+    fontSize: 17,
+    lineHeight: 26,
+    fontWeight: '700',
+    maxWidth: 680
   },
-  heroAccountHint: {
-    fontSize: 13,
-    color: '#546e57',
-    textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 14,
-    lineHeight: 20,
-    fontWeight: '500'
-  },
-  searchContainer: {
+  heroActions: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    width: '100%',
-    padding: 5,
-    elevation: 3,
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 24
+  },
+  primaryCta: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    borderRadius: 8
+  },
+  primaryCtaText: {
+    color: '#14532d',
+    fontWeight: '900',
+    fontSize: 15
+  },
+  secondaryCta: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    borderRadius: 8
+  },
+  secondaryCtaText: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 15
+  },
+  searchBand: {
+    marginHorizontal: 18,
+    marginTop: -28,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+    padding: 8,
+    flexDirection: 'row',
+    gap: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3
   },
   searchInput: {
     flex: 1,
-    paddingHorizontal: 15,
-    fontSize: 16,
+    minHeight: 46,
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '700',
+    paddingHorizontal: 12
   },
-  searchBtn: {
+  searchButton: {
     backgroundColor: '#166534',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
     borderRadius: 8,
+    paddingHorizontal: 18,
     justifyContent: 'center',
+    alignItems: 'center'
   },
-  searchBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
+  searchButtonText: {
+    color: '#ffffff',
+    fontWeight: '900'
   },
-  statsContainer: {
+  statsBand: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginTop: -30,
-    marginBottom: 30,
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingTop: 22
   },
-  statBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    padding: 15,
-    width: '31%',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  statItem: {
+    flex: 1,
+    minWidth: 145,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 16
   },
-  statIcon: {
-    fontSize: 28,
-    marginBottom: 5,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#212121',
+  statValue: {
+    color: '#166534',
+    fontSize: 22,
+    fontWeight: '900'
   },
   statLabel: {
+    color: '#64748b',
     fontSize: 12,
-    color: '#757575',
-    textAlign: 'center',
-    marginTop: 2,
+    fontWeight: '800',
+    marginTop: 4
   },
-  sectionContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  section: {
+    paddingHorizontal: 18,
+    paddingTop: 30
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginBottom: 15,
+    gap: 14,
+    marginBottom: 14
   },
   sectionTitle: {
+    color: '#111827',
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212121',
+    fontWeight: '900'
   },
-  viewAllText: {
+  sectionSubtitle: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 4
+  },
+  linkText: {
     color: '#15803d',
-    fontWeight: 'bold',
-    marginBottom: 3,
+    fontWeight: '900'
   },
-  productScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
+  loader: {
+    marginVertical: 30
+  },
+  productRow: {
+    paddingVertical: 4,
+    paddingRight: 18
   },
   productCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    width: 200,
-    marginRight: 15,
+    width: 190,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    marginRight: 12,
     overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
   },
   productImage: {
     width: '100%',
-    height: 140,
-    backgroundColor: '#EEEEEE',
+    height: 126,
+    backgroundColor: '#e2e8f0'
+  },
+  imagePlaceholder: {
+    backgroundColor: '#e2e8f0'
   },
   productInfo: {
-    padding: 15,
+    padding: 12
   },
   productName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginBottom: 4,
+    color: '#111827',
+    fontWeight: '900',
+    fontSize: 15
   },
   productPrice: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#15803d',
-    marginBottom: 4,
+    color: '#166534',
+    fontWeight: '900',
+    marginTop: 5
   },
   farmerName: {
+    color: '#64748b',
+    fontWeight: '700',
     fontSize: 12,
-    color: '#757575',
+    marginTop: 4
+  },
+  emptyPanel: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 18
+  },
+  emptyTitle: {
+    color: '#111827',
+    fontWeight: '900',
+    fontSize: 16
   },
   emptyText: {
-    color: '#757575',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginVertical: 20,
+    color: '#64748b',
+    fontWeight: '700',
+    marginTop: 6
   },
-  stepsGrid: {
+  featureGrid: {
+    gap: 12,
+    marginTop: 14
+  },
+  featureItem: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 16
+  },
+  featureTitle: {
+    color: '#14532d',
+    fontWeight: '900',
+    fontSize: 17
+  },
+  featureText: {
+    color: '#475569',
+    fontWeight: '700',
+    lineHeight: 21,
+    marginTop: 6
+  },
+  steps: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 14
+  },
+  stepItem: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  stepCard: {
-    width: '48%',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 15,
-    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9'
   },
   stepNumber: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
+    width: 38,
+    color: '#166534',
+    fontWeight: '900',
+    fontSize: 16
   },
-  stepNumberText: {
-    color: '#15803d',
-    fontSize: 18,
-    fontWeight: 'bold',
+  stepCopy: {
+    flex: 1
   },
   stepTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginBottom: 5,
-    textAlign: 'center',
+    color: '#111827',
+    fontWeight: '900'
   },
-  stepDesc: {
-    fontSize: 12,
-    color: '#757575',
-    textAlign: 'center',
-    lineHeight: 18,
+  stepText: {
+    color: '#64748b',
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 4
   },
-  ctaBanner: {
-    backgroundColor: '#2E7D32',
-    padding: 40,
-    alignItems: 'center',
-    marginHorizontal: 20,
-    borderRadius: 20,
-    marginTop: 20,
-    marginBottom: 40,
+  ctaBand: {
+    marginHorizontal: 18,
+    marginTop: 34,
+    backgroundColor: '#14532d',
+    borderRadius: 8,
+    padding: 22
   },
   ctaTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 10,
-    textAlign: 'center',
+    color: '#ffffff',
+    fontSize: 23,
+    fontWeight: '900'
   },
-  ctaSubtitle: {
-    fontSize: 14,
-    color: '#E8F5E9',
-    marginBottom: 20,
-    textAlign: 'center',
+  ctaText: {
+    color: '#bbf7d0',
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 8
   },
-  ctaBtn: {
-    backgroundColor: '#166534',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 30,
-    elevation: 3,
+  ctaButton: {
+    backgroundColor: '#ffffff',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16
   },
-  ctaBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
+  ctaButtonText: {
+    color: '#14532d',
+    fontWeight: '900'
   },
   footer: {
-    alignItems: 'center',
-    padding: 30,
-    borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
+    paddingHorizontal: 18,
+    paddingTop: 34,
+    paddingBottom: 10
+  },
+  footerBrand: {
+    color: '#14532d',
+    fontWeight: '900',
+    fontSize: 18
   },
   footerText: {
-    color: '#9E9E9E',
+    color: '#475569',
+    fontWeight: '700',
+    marginTop: 6
+  },
+  footerMeta: {
+    color: '#94a3b8',
     fontSize: 12,
-    marginTop: 4,
+    fontWeight: '700',
+    marginTop: 16
   }
 });
 
